@@ -6,6 +6,13 @@
 
 <!-- Primary SEO -->
 <title>Cringley Cottage | Holiday Cottage in Askrigg, Yorkshire Dales</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#5e7a52">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Cringley Cottage">
 <meta name="description" content="Cringley Cottage is a charming 2-bedroom holiday cottage in Askrigg, heart of the Yorkshire Dales. Sleeps 4, log burning stove, private garden. Dog friendly. Book direct.">
 <meta name="keywords" content="holiday cottage Askrigg, Yorkshire Dales cottage, self catering Wensleydale, dog friendly cottage Yorkshire, Cringley Cottage, cottage Askrigg, holiday rental Yorkshire Dales">
 <link rel="canonical" href="https://www.cringleycottage.com/">
@@ -1973,6 +1980,13 @@
     try { await loadRatesFromSheet(); } catch(e) {}
     await syncCalendar();
   })();
+
+  // ─── PWA — SERVICE WORKER ───────────────────────────────────────
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('sw.js').catch(() => { /* PWA install just won't be offered — site still works normally */ });
+    });
+  }
 
 </script>
 </body>
