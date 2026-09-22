@@ -1383,42 +1383,28 @@
   function nightRate(date)     { return getRateEntry(date).rate; }
   function getMinNights(date)  { return getRateEntry(date).minNights; }
 
-  // ─── GOOGLE CALENDAR iCAL ───────────────────────────────────────
-  const ICAL_URL = '/.netlify/functions/calendar';
+  // ─── AVAILABILITY (Supabase) ─────────────────────────────────────
+  const SUPABASE_URL = 'https://yfeyswuxhgezkpcjhznp.supabase.co';
+  const SUPABASE_ANON_KEY = 'sb_publishable_96mc6z7EpkjnKPsMX0z5Ug_BJ7MDBNp';
   let bookedRanges = [];
-
-  function parseICalDate(str) {
-    const s = str.replace(/T.*$/, '').trim();
-    return new Date(parseInt(s.slice(0,4)), parseInt(s.slice(4,6))-1, parseInt(s.slice(6,8)));
-  }
 
   async function syncCalendar() {
     const statusEl = document.getElementById('icalStatus');
     try {
       const ctrl = new AbortController();
       setTimeout(() => ctrl.abort(), 6000);
-      const res = await fetch(ICAL_URL, { signal: ctrl.signal });
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/availability?select=checkin,checkout`, {
+        signal: ctrl.signal,
+        headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` }
+      });
       if (!res.ok) throw new Error('HTTP ' + res.status);
-      const text = await res.text();
-      const ranges = [];
-      const lines = text.split(/\r?\n/);
-      let inEvent = false, dtstart = null, dtend = null;
-      for (const line of lines) {
-        if (line.trim() === 'BEGIN:VEVENT')  { inEvent = true; dtstart = null; dtend = null; }
-        if (line.trim() === 'END:VEVENT')    {
-          if (dtstart && dtend) {
-            const s = new Date(dtstart); s.setHours(0,0,0,0);
-            const e = new Date(dtend);   e.setHours(0,0,0,0);
-            e.setDate(e.getDate() - 2); // iCal DTEND is day-after-last, minus 1 more frees checkout day
-            if (e >= s) ranges.push({ start: s, end: e });
-          }
-          inEvent = false;
-        }
-        if (inEvent) {
-          if (/^DTSTART/i.test(line)) dtstart = parseICalDate(line.split(':').slice(1).join(':'));
-          if (/^DTEND/i.test(line))   dtend   = parseICalDate(line.split(':').slice(1).join(':'));
-        }
-      }
+      const rows = await res.json();
+      const ranges = rows.map(r => {
+        const s = new Date(r.checkin + 'T00:00:00'); s.setHours(0,0,0,0);
+        const e = new Date(r.checkout + 'T00:00:00'); e.setHours(0,0,0,0);
+        e.setDate(e.getDate() - 2); // checkout is exclusive; -1 more frees the checkout day itself
+        return { start: s, end: e };
+      }).filter(r => r.end >= r.start);
       bookedRanges = ranges;
       buildCal();
       if (statusEl) statusEl.textContent = 'Availability up to date ✓';
@@ -1619,6 +1605,35 @@
     showToast('Thank you! We\'ll be in touch within 24 hours. ✓');
     e.target.reset();
   }
+
+  // Record a pending direct booking in Supabase alongside the Formspree enquiry.
+  // Runs in parallel — never blocks or breaks the existing Formspree submission.
+  (() => {
+    const form = document.getElementById('enquiryForm');
+    if (!form) return;
+    form.addEventListener('submit', () => {
+      try {
+        const guestsRaw = document.getElementById('enqGuests')?.value || '';
+        const guestsCount = parseInt(guestsRaw, 10) || null;
+        const payload = {
+          checkin: document.getElementById('enqArrival')?.value || null,
+          checkout: document.getElementById('enqDeparture')?.value || null,
+          first_name: document.getElementById('enqName')?.value || null,
+          last_name: form.querySelector('[name="last_name"]')?.value || null,
+          email: form.querySelector('[name="email"]')?.value || null,
+          phone: form.querySelector('[name="phone"]')?.value || null,
+          guests_count: guestsCount,
+          message: form.querySelector('[name="message"]')?.value || null,
+        };
+        fetch(`${SUPABASE_URL}/functions/v1/create-booking`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+          keepalive: true,
+        }).catch(() => { /* silent — Formspree submission is the fallback of record */ });
+      } catch (e) { /* never block the real form submission */ }
+    });
+  })();
 
   // ─── TOAST ──────────────────────────────────────────────────────
   function showToast(msg) {
