@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Guest Information — Cringley Cottage</title>
+<meta name="robots" content="noindex, nofollow">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --ink: #232120; --cream: #f3ede3; --stone: #dfd8cb;
+    --sage: #5e7a52; --sage-light: #84a472; --muted: #7a6f60; --white: #fff;
+  }
+  body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(--ink); }
+
+  /* HERO */
+  .hero {
+    background: var(--ink); padding: 3rem 6%;
+    text-align: center; position: relative; overflow: hidden;
+  }
+  .hero::before {
+    content: ''; position: absolute; inset: 0;
+    background: url('413188738.jpg') center/cover no-repeat;
+    opacity: 0.15;
+  }
+  .hero-inner { position: relative; z-index: 1; }
+  .logo {
+    font-family: 'Cormorant Garamond', serif; font-size: 1.2rem; font-weight: 600;
+    color: #fff; letter-spacing: 0.14em; text-transform: uppercase;
+    text-decoration: none; border: 1px solid rgba(255,255,255,0.25);
+    padding: 0.35rem 0.9rem; border-radius: 2px; display: inline-block; margin-bottom: 2rem;
+  }
+  .hero h1 {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: clamp(2rem, 5vw, 3.2rem); font-weight: 600;
+    color: #fff; margin-bottom: 0.5rem;
+  }
+  .hero p { font-size: 1rem; color: rgba(247,242,234,0.7); font-weight: 300; }
+
+  /* QUICK INFO STRIP */
+  .quick-strip {
+    background: var(--sage); display: flex; flex-wrap: wrap;
+    justify-content: center; gap: 0;
+  }
+  .qs-item {
+    padding: 1rem 2rem; text-align: center;
+    border-right: 1px solid rgba(255,255,255,0.15);
+  }
+  .qs-item:last-child { border-right: none; }
+  .qs-val {
+    font-family: 'Cormorant Garamond', serif; font-size: 1.6rem;
+    font-weight: 600; color: #fff; line-height: 1;
+  }
+  .qs-label { font-size: 0.68rem; letter-spacing: 0.12em; text-transform: uppercase; color: rgba(255,255,255,0.75); margin-top: 0.2rem; }
+
+  /* CONTENT */
+  .page-wrap { max-width: 760px; margin: 0 auto; padding: 3.5rem 6% 5rem; }
+
+  .section { margin-bottom: 2.5rem; }
+  .section-label {
+    font-size: 0.7rem; letter-spacing: 0.2em; text-transform: uppercase;
+    color: var(--sage); font-weight: 500; margin-bottom: 0.5rem;
+  }
+  .section h2 {
+    font-family: 'Cormorant Garamond', serif; font-size: 1.6rem;
+    font-weight: 600; color: var(--ink); margin-bottom: 1rem;
+    padding-bottom: 0.6rem; border-bottom: 1px solid var(--stone);
+  }
+  .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+  .info-card {
+    background: var(--white); border: 1px solid var(--stone);
+    border-radius: 2px; padding: 1.2rem;
+  }
+  .info-card strong {
+    display: block; font-size: 0.72rem; letter-spacing: 0.1em;
+    text-transform: uppercase; color: var(--sage); margin-bottom: 0.35rem;
+  }
+  .info-card p { font-size: 0.9rem; color: var(--ink); font-weight: 300; line-height: 1.6; }
+  .info-card a { color: var(--sage); text-decoration: none; }
+  .info-card a:hover { text-decoration: underline; }
+
+  ul.info-list { list-style: none; padding: 0; }
+  ul.info-list li {
+    font-size: 0.92rem; font-weight: 300; color: var(--ink);
+    padding: 0.5rem 0 0.5rem 1.4rem; position: relative;
+    border-bottom: 1px solid rgba(223,216,203,0.5);
+  }
+  ul.info-list li:last-child { border-bottom: none; }
+  ul.info-list li::before { content: '—'; position: absolute; left: 0; color: var(--sage); }
+
+  .highlight-box {
+    background: var(--ink); border-radius: 2px;
+    padding: 2rem; margin-bottom: 2.5rem;
+    display: flex; align-items: center; gap: 1.5rem; flex-wrap: wrap;
+  }
+  .highlight-box .hb-text h3 {
+    font-family: 'Cormorant Garamond', serif; font-size: 1.4rem;
+    font-weight: 600; color: #fff; margin-bottom: 0.4rem;
+  }
+  .highlight-box .hb-text p { font-size: 0.88rem; color: rgba(247,242,234,0.65); font-weight: 300; line-height: 1.65; }
+  .hb-btn {
+    flex-shrink: 0; background: var(--sage); color: #fff;
+    padding: 0.75rem 1.5rem; border-radius: 2px; text-decoration: none;
+    font-size: 0.8rem; letter-spacing: 0.08em; text-transform: uppercase;
+    font-weight: 500; white-space: nowrap; transition: background 0.2s;
+  }
+  .hb-btn:hover { background: var(--sage-light); }
+
+  .maint-banner {
+    background: var(--white); border: 1px solid var(--stone);
+    border-left: 3px solid var(--sage); border-radius: 0 2px 2px 0;
+    padding: 1.2rem 1.5rem; margin-bottom: 2.5rem;
+    display: flex; align-items: center; justify-content: space-between;
+    flex-wrap: wrap; gap: 1rem;
+  }
+  .maint-banner p { font-size: 0.9rem; color: var(--muted); font-weight: 300; }
+  .maint-banner p strong { color: var(--ink); font-weight: 500; }
+  .maint-btn {
+    background: var(--sage); color: #fff; padding: 0.6rem 1.2rem;
+    border-radius: 2px; text-decoration: none; font-size: 0.8rem;
+    letter-spacing: 0.06em; text-transform: uppercase; white-space: nowrap;
+    transition: background 0.2s;
+  }
+  .maint-btn:hover { background: var(--sage-light); }
+
+  .walks-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
+  .walk-item {
+    background: var(--white); border: 1px solid var(--stone);
+    border-radius: 2px; padding: 1rem;
+  }
+  .walk-item strong { display: block; font-size: 0.85rem; font-weight: 500; margin-bottom: 0.2rem; }
+  .walk-item span { font-size: 0.78rem; color: var(--muted); }
+
+  footer { background: var(--ink); padding: 2.5rem 6%; text-align: center; }
+  footer p { font-size: 0.75rem; color: rgba(247,242,234,0.35); line-height: 1.8; }
+  footer a { color: var(--sage-light); text-decoration: none; }
+
+  @media (max-width: 560px) {
+    .info-grid, .walks-grid { grid-template-columns: 1fr; }
+    .quick-strip { flex-direction: column; }
+    .qs-item { border-right: none; border-bottom: 1px solid rgba(255,255,255,0.15); }
+  }
+</style>
+</head>
+<body>
+
+<!-- HERO -->
+<div class="hero">
+  <div class="hero-inner">
+    <a href="index.html" class="logo">Cringley Cottage</a>
+    <h1>Welcome to Cringley Cottage</h1>
+    <p>Everything you need for your stay in Askrigg, Yorkshire Dales</p>
+  </div>
+</div>
+
+<!-- QUICK STRIP -->
+<div class="quick-strip">
+  <div class="qs-item">
+    <div class="qs-val">3pm</div>
+    <div class="qs-label">Check-in from</div>
+  </div>
+  <div class="qs-item">
+    <div class="qs-val">10am</div>
+    <div class="qs-label">Check-out by</div>
+  </div>
+  <div class="qs-item">
+    <div class="qs-val">4</div>
+    <div class="qs-label">Max guests</div>
+  </div>
+  <div class="qs-item">
+    <div class="qs-val">🐕</div>
+    <div class="qs-label">Dogs welcome</div>
+  </div>
+</div>
+
+<div class="page-wrap">
+
+  <!-- MAINTENANCE BANNER -->
+  <div class="maint-banner">
+    <p><strong>Noticed something that needs attention?</strong> Please let us know straight away — we'll get it sorted as quickly as possible.</p>
+    <a href="maintenance.html" class="maint-btn">Report an issue</a>
+  </div>
+
+  <!-- ARRIVAL -->
+  <div class="section">
+    <p class="section-label">Arrival</p>
+    <h2>Getting In</h2>
+    <div class="info-grid">
+      <div class="info-card">
+        <strong>Address</strong>
+        <p>Cringley Cottage<br>Silver Street<br>Askrigg, Leyburn<br>DL8 3HS</p>
+      </div>
+      <div class="info-card">
+        <strong>What3Words</strong>
+        <p><a href="https://what3words.com/lamps.enter.risky" target="_blank">///lamps.enter.risky</a><br><br>Useful for precise navigation into the village.</p>
+      </div>
+      <div class="info-card">
+        <strong>Parking</strong>
+        <p>Parking is available on Silver Street directly outside the cottage. Askrigg village car park is also a short walk away.</p>
+      </div>
+      <div class="info-card">
+        <strong>Key / Access</strong>
+        <p>Access details will be sent to you separately before arrival. Please keep the property secured when out.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ESSENTIALS -->
+  <div class="section">
+    <p class="section-label">The Cottage</p>
+    <h2>Good to Know</h2>
+    <div class="info-grid">
+      <div class="info-card">
+        <strong>WiFi</strong>
+        <p>Network and password details are on the card in the kitchen. Please ask if you can't find it.</p>
+      </div>
+      <div class="info-card">
+        <strong>Heating</strong>
+        <p>Central heating controls are in the hallway. Please close windows and doors when the heating is on.</p>
+      </div>
+      <div class="info-card">
+        <strong>Log Burning Stove</strong>
+        <p>Logs and kindling are provided. Instructions are on the card by the stove. Never leave unattended or overnight.</p>
+      </div>
+      <div class="info-card">
+        <strong>Bins</strong>
+        <p>General waste and recycling bins are outside the back door. Please bag all rubbish before placing in bins.</p>
+      </div>
+      <div class="info-card">
+        <strong>Towels &amp; Linen</strong>
+        <p>Fresh towels and bed linen are provided. Beach/dog towels are not included — please bring your own.</p>
+      </div>
+      <div class="info-card">
+        <strong>Starter Pack</strong>
+        <p>We provide a small welcome pack including tea, coffee, milk, and a few local treats to get you started.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- EATING OUT -->
+  <div class="section">
+    <p class="section-label">Food &amp; Drink</p>
+    <h2>Local Recommendations</h2>
+    <ul class="info-list">
+      <li><strong>The Kings Arms, Askrigg</strong> — classic Dales pub, good food, very dog friendly. A short walk from the cottage.</li>
+      <li><strong>The Crown Inn, Askrigg</strong> — another village favourite, relaxed atmosphere and local ales.</li>
+      <li><strong>Bolton Arms, Aysgarth</strong> — lovely pub near the famous falls, great for a post-walk pint.</li>
+      <li><strong>Wensleydale Creamery, Hawes</strong> — home of the famous Yorkshire cheese. Tours, tastings and a great café. Worth a visit.</li>
+      <li><strong>Cockett's Hotel, Hawes</strong> — popular spot for lunch in Hawes town centre.</li>
+      <li><strong>The Farmers Arms, Muker</strong> — a beautiful drive over the tops, excellent pub in a stunning village.</li>
+    </ul>
+  </div>
+
+  <!-- WALKS -->
+  <div class="section">
+    <p class="section-label">Outdoors</p>
+    <h2>Walks from the Door</h2>
+    <div class="walks-grid">
+      <div class="walk-item">
+        <strong>Mill Gill Force</strong>
+        <span>0.5 mi · Easy · 30 min · Hidden waterfall through ancient woodland</span>
+      </div>
+      <div class="walk-item">
+        <strong>Whitfield Gill</strong>
+        <span>2 mi · Moderate · 2 hrs · Dramatic limestone gorge</span>
+      </div>
+      <div class="walk-item">
+        <strong>Askrigg Common</strong>
+        <span>4 mi · Moderate · 3 hrs · Open fell with sweeping Dales views</span>
+      </div>
+      <div class="walk-item">
+        <strong>Aysgarth Falls</strong>
+        <span>6 mi · Easy · 3 hrs · Iconic triple waterfall</span>
+      </div>
+      <div class="walk-item">
+        <strong>Hardraw Force</strong>
+        <span>8 mi · Moderate · 4 hrs · England's highest single-drop waterfall</span>
+      </div>
+      <div class="walk-item">
+        <strong>Buttertubs Pass</strong>
+        <span>Variable · Cycling · Dramatic road cycling over the tops</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- USEFUL INFO -->
+  <div class="section">
+    <p class="section-label">Useful</p>
+    <h2>Emergency &amp; Useful Contacts</h2>
+    <div class="info-grid">
+      <div class="info-card">
+        <strong>Emergency Services</strong>
+        <p>999 — Police, Fire, Ambulance<br>101 — Non-emergency police</p>
+      </div>
+      <div class="info-card">
+        <strong>NHS</strong>
+        <p>111 — Non-emergency medical advice<br>Available 24 hours</p>
+      </div>
+      <div class="info-card">
+        <strong>Nearest Hospital</strong>
+        <p>The Friarage Hospital<br>Northallerton, DL6 1JG<br>01609 779911</p>
+      </div>
+      <div class="info-card">
+        <strong>Local Vet</strong>
+        <p>Bishopton Veterinary Group<br>Bedale — 01677 422610</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- BOOK DIRECT PROMPT -->
+  <div class="highlight-box">
+    <div class="hb-text">
+      <h3>Enjoyed your stay?</h3>
+      <p>Book your next visit directly through our website — it's the easiest way to check availability, get an instant price and enquire about dates. We'd love to welcome you back to Cringley Cottage.</p>
+    </div>
+    <a href="index.html" class="hb-btn">Visit our website</a>
+  </div>
+
+  <!-- DEPARTURE -->
+  <div class="section">
+    <p class="section-label">Departure</p>
+    <h2>Checking Out</h2>
+    <ul class="info-list">
+      <li>Please check out by 10:00 am. Let us know if you need a slightly later departure and we'll do our best to help.</li>
+      <li>Wash up any dishes and leave the kitchen tidy.</li>
+      <li>Bag all rubbish and place in the outdoor bins.</li>
+      <li>Close all windows and lock all doors before leaving.</li>
+      <li>Return keys as instructed in your arrival information.</li>
+      <li>We hope you had a wonderful stay — a review on Booking.com or Airbnb means the world to us and helps other guests find the cottage.</li>
+    </ul>
+  </div>
+
+</div>
+
+<footer>
+  <p>
+    Cringley Cottage &middot; Stars And Stiles Limited &middot; Co. No. 14294081<br>
+    <a href="mailto:hello@cringleycottage.com">hello@cringleycottage.com</a> &nbsp;&middot;&nbsp;
+    <a href="index.html">cringleycottage.com</a>
+  </p>
+</footer>
+
+</body>
+</html>
