@@ -1578,17 +1578,25 @@
   });
 
   // ─── BOOKING PANEL SUMMARY ──────────────────────────────────────
+  function setBpSubmitEnabled(enabled) {
+    const btn = document.getElementById('bpSubmit');
+    btn.disabled = !enabled;
+    btn.style.opacity = enabled ? '1' : '0.45';
+    btn.style.cursor = enabled ? 'pointer' : 'not-allowed';
+  }
+
   function updateSummary() {
     const ci = document.getElementById('bpCheckin').value;
     const co = document.getElementById('bpCheckout').value;
-    if (!ci || !co) return;
+    if (!ci || !co) { setBpSubmitEnabled(false); return; }
     const sDate = new Date(ci), eDate = new Date(co);
     const nights = Math.round((eDate - sDate) / 86400000);
-    if (nights <= 0) return;
+    if (nights <= 0) { setBpSubmitEnabled(false); return; }
     const minN = getMinNights(sDate);
     const summary = document.getElementById('bpSummary');
     if (nights < minN) {
       summary.innerHTML = `<div class="bp-line" style="color:var(--sage-light)"><span>Minimum stay for these dates is ${minN} nights</span></div>`;
+      setBpSubmitEnabled(false);
       return;
     }
     const breakdown = {};
@@ -1611,6 +1619,7 @@
       `<div class="bp-line"><span>${Math.round(DEPOSIT_RATE*100)}% deposit to secure</span><span>£${deposit}</span></div>`;
     const priceField = document.getElementById('enqPrice');
     if (priceField) priceField.value = `£${finalTotal} for ${nights} night${nights!==1?'s':''}`;
+    setBpSubmitEnabled(true);
   }
 
   document.getElementById('bpCheckin').addEventListener('change', updateSummary);
