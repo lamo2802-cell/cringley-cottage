@@ -1612,6 +1612,16 @@
     holdTimerInterval = setInterval(tick, 1000);
   }
 
+  // Release the hold early if the visitor closes the tab / navigates away
+  // before submitting — no need to make anyone else wait the full 30 minutes.
+  window.addEventListener('pagehide', () => {
+    if (!activeHold) return;
+    try {
+      const blob = new Blob([JSON.stringify({ hold_id: activeHold.id })], { type: 'text/plain;charset=UTF-8' });
+      navigator.sendBeacon(`${SUPABASE_URL}/functions/v1/release-hold`, blob);
+    } catch (e) { /* best-effort — the 30-min expiry and cleanup job are the fallback */ }
+  });
+
   document.getElementById('bpSubmit').addEventListener('click', async () => {
     const ci = document.getElementById('bpCheckin').value;
     const co = document.getElementById('bpCheckout').value;
@@ -1685,6 +1695,7 @@
           body: JSON.stringify(payload),
           keepalive: true,
         }).catch(() => { /* silent — Formspree submission is the fallback of record */ });
+        activeHold = null; // finalized — the pagehide handler must not release this one
       } catch (e) { /* never block the real form submission */ }
     });
   })();
