@@ -4,7 +4,7 @@
 // confusion we've already had with GitHub Pages, this service worker must
 // never be the reason someone gets stuck on a stale version of the site.
 
-const CACHE_NAME = 'cringley-cottage-v1';
+const CACHE_NAME = 'cringley-cottage-v2';
 const APP_SHELL = [
   './',
   './index.html',
@@ -15,7 +15,11 @@ const APP_SHELL = [
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL))
+    caches.open(CACHE_NAME).then((cache) =>
+      Promise.all(APP_SHELL.map((url) =>
+        fetch(url, { cache: 'no-store' }).then((res) => cache.put(url, res))
+      ))
+    )
   );
   self.skipWaiting();
 });
@@ -41,7 +45,7 @@ self.addEventListener('fetch', (event) => {
   // HTML pages: network-first, cache as a fallback for offline only.
   if (req.mode === 'navigate' || (req.headers.get('accept') || '').includes('text/html')) {
     event.respondWith(
-      fetch(req)
+      fetch(req, { cache: 'no-store' })
         .then((res) => {
           const copy = res.clone();
           caches.open(CACHE_NAME).then((cache) => cache.put(req, copy));
