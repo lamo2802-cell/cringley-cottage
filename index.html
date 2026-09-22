@@ -869,9 +869,26 @@
     .nav-links { display: none; }
     .bp-row { grid-template-columns: 1fr; }
   }
+  .float-book {
+    position: fixed; right: 22px; bottom: 22px; z-index: 50;
+    background: var(--sage); color: var(--cream); text-decoration: none;
+    font-family: 'DM Sans', sans-serif; font-size: 0.82rem; letter-spacing: 0.08em;
+    text-transform: uppercase; padding: 0.85rem 1.4rem; border-radius: 999px;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.25);
+    display: flex; align-items: center; gap: 0.5rem;
+    opacity: 0; transform: translateY(12px) scale(0.96); pointer-events: none;
+    transition: opacity 0.25s ease, transform 0.25s ease, background 0.2s ease;
+  }
+  .float-book.visible { opacity: 1; transform: translateY(0) scale(1); pointer-events: auto; }
+  .float-book:hover { background: var(--sage-light); }
+  @media (max-width: 640px) {
+    .float-book { right: 14px; bottom: 14px; padding: 0.75rem 1.15rem; font-size: 0.76rem; }
+  }
 </style>
 </head>
 <body>
+
+<a href="#availability" class="float-book" id="floatBookBtn">&#128197; Book Now</a>
 
 <!-- NAV -->
 <nav>
@@ -1734,6 +1751,24 @@
         // video stays hidden, snow image (hero background) shows permanently
       }, 2000);
     });
+  })();
+
+  // ─── FLOATING BOOK NOW BUTTON ───────────────────────────────────
+  (() => {
+    const btn = document.getElementById('floatBookBtn');
+    const hero = document.getElementById('hero');
+    const avail = document.getElementById('availability');
+    if (!btn || !hero || !avail) return;
+    let pastHero = false, onAvailability = false;
+    const update = () => { btn.classList.toggle('visible', pastHero && !onAvailability); };
+    new IntersectionObserver((entries) => {
+      entries.forEach(e => { if (e.target === hero) pastHero = !e.isIntersecting; });
+      update();
+    }, { threshold: 0 }).observe(hero);
+    new IntersectionObserver((entries) => {
+      entries.forEach(e => { if (e.target === avail) onAvailability = e.isIntersecting; });
+      update();
+    }, { threshold: 0.15 }).observe(avail);
   })();
 
   // ─── NAV ACTIVE ─────────────────────────────────────────────────
