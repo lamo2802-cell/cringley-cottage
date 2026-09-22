@@ -1161,46 +1161,76 @@
         <p class="bp-small">7+ nights get 10% off &middot; 25% deposit to secure</p>
       </div>
 
-      <!-- STEP 2: Enquiry form -->
+      <!-- STEP 2: Guest details -->
       <div id="bpStep2" style="display:none">
         <button id="bpBack" style="background:none;border:none;color:rgba(247,242,234,0.5);font-size:0.8rem;cursor:pointer;padding:0;margin-bottom:1.2rem;letter-spacing:0.05em;">&#8592; Back to dates</button>
         <p class="bp-title">Your Details</p>
         <div id="bpDateSummaryBox" style="background:rgba(94,122,82,0.18);border:1px solid rgba(94,122,82,0.35);border-radius:2px;padding:0.8rem 1rem;margin-bottom:1.2rem;font-size:0.82rem;color:rgba(247,242,234,0.85);line-height:1.7;"></div>
-        <form id="bpEnquiryForm" name="booking-enquiry" data-netlify="true" onsubmit="handleBpSubmit(event)">
-          <input type="hidden" name="form-name" value="booking-enquiry">
-          <input type="hidden" name="checkin" id="bpFormCheckin">
-          <input type="hidden" name="checkout" id="bpFormCheckout">
-          <input type="hidden" name="guests" id="bpFormGuests">
-          <input type="hidden" name="estimated-total" id="bpFormTotal">
+        <div id="bpHoldBanner" style="display:none;background:rgba(94,122,82,0.18);border:1px solid rgba(94,122,82,0.35);border-radius:2px;padding:0.6rem 0.9rem;margin-bottom:1rem;font-size:0.78rem;color:rgba(247,242,234,0.85);">
+          Dates held for <strong id="bpHoldTimerText">30:00</strong>
+        </div>
+        <form id="bpEnquiryForm">
+          <p style="font-size:0.75rem;text-transform:uppercase;letter-spacing:0.08em;color:rgba(247,242,234,0.5);margin-bottom:0.6rem;">Lead guest</p>
           <div class="bp-row">
             <div class="bp-field">
               <label>First name *</label>
-              <input type="text" name="firstname" required placeholder="Jane">
+              <input type="text" id="bpFirstName" required placeholder="Jane">
             </div>
             <div class="bp-field">
               <label>Last name *</label>
-              <input type="text" name="lastname" required placeholder="Smith">
+              <input type="text" id="bpLastName" required placeholder="Smith">
             </div>
           </div>
           <div class="bp-field" style="margin-bottom:0.75rem">
             <label>Email *</label>
-            <input type="email" name="email" required placeholder="jane@example.com">
+            <input type="email" id="bpEmail" required placeholder="jane@example.com">
           </div>
           <div class="bp-field" style="margin-bottom:0.75rem">
             <label>Phone</label>
-            <input type="tel" name="phone" placeholder="+44 7700 900000">
+            <input type="tel" id="bpPhone" placeholder="+44 7700 900000">
           </div>
+
+          <p style="font-size:0.75rem;text-transform:uppercase;letter-spacing:0.08em;color:rgba(247,242,234,0.5);margin:1rem 0 0.6rem;">Home address</p>
+          <div class="bp-field" style="margin-bottom:0.75rem">
+            <label>Address line 1 *</label>
+            <input type="text" id="bpAddr1" required placeholder="123 High Street">
+          </div>
+          <div class="bp-field" style="margin-bottom:0.75rem">
+            <label>Address line 2</label>
+            <input type="text" id="bpAddr2" placeholder="">
+          </div>
+          <div class="bp-row">
+            <div class="bp-field">
+              <label>City *</label>
+              <input type="text" id="bpCity" required placeholder="Leeds">
+            </div>
+            <div class="bp-field">
+              <label>Postcode *</label>
+              <input type="text" id="bpPostcode" required placeholder="LS1 1AA">
+            </div>
+          </div>
+          <div class="bp-field" style="margin-bottom:0.75rem">
+            <label>Country</label>
+            <input type="text" id="bpCountry" value="United Kingdom">
+          </div>
+
+          <div id="bpExtraGuestsWrap" style="margin-top:1rem;"></div>
+
+          <div class="bp-field" style="margin:1rem 0 0.75rem;display:flex;align-items:center;gap:0.6rem;">
+            <input type="checkbox" id="bpHasDog" style="width:auto;">
+            <label for="bpHasDog" style="margin:0;">Bringing a dog?</label>
+          </div>
+
           <div class="bp-field" style="margin-bottom:1rem">
             <label>Anything to tell us?</label>
-            <textarea name="message" rows="3" placeholder="Special requirements, questions..." style="background:rgba(247,242,234,0.07);border:1px solid rgba(247,242,234,0.12);color:var(--cream);padding:0.65rem 0.85rem;font-family:'DM Sans',sans-serif;font-size:0.85rem;border-radius:2px;width:100%;resize:vertical;outline:none;transition:border-color 0.2s;"></textarea>
+            <textarea id="bpMessage" rows="3" placeholder="Special requirements, questions..." style="background:rgba(247,242,234,0.07);border:1px solid rgba(247,242,234,0.12);color:var(--cream);padding:0.65rem 0.85rem;font-family:'DM Sans',sans-serif;font-size:0.85rem;border-radius:2px;width:100%;resize:vertical;outline:none;transition:border-color 0.2s;"></textarea>
           </div>
-          <button type="submit" class="bp-submit">Send Enquiry</button>
-          <p class="bp-small">No payment now &middot; We'll confirm &amp; send a deposit invoice</p>
+          <button type="submit" class="bp-submit" id="bpFinalSubmit">Continue to Payment</button>
+          <p class="bp-small" id="bpPaymentNote">25% deposit to secure &middot; balance due before arrival</p>
         </form>
         <div id="bpSuccess" style="display:none;text-align:center;padding:2rem 0">
           <div style="font-size:2.5rem;margin-bottom:0.8rem;color:var(--sage-light)">&#10003;</div>
-          <p style="color:var(--cream);font-family:'Cormorant Garamond',serif;font-size:1.4rem;font-weight:600;margin-bottom:0.5rem">Enquiry sent!</p>
-          <p style="font-size:0.82rem;color:rgba(247,242,234,0.55);line-height:1.7">We'll be in touch within 24 hours to confirm your dates and send a deposit link.</p>
+          <p style="color:var(--cream);font-family:'Cormorant Garamond',serif;font-size:1.4rem;font-weight:600;margin-bottom:0.5rem">Taking you to payment…</p>
         </div>
       </div>
 
@@ -1250,10 +1280,7 @@
   <div class="contact-form-wrap">
     <div class="form-intro">
       <span class="form-step-label">Enquiry Form</span>
-      <p style="font-size:0.82rem;color:var(--muted);margin-top:0.3rem">Your dates are pre-filled if you used the availability checker above.</p>
-    </div>
-    <div id="holdTimerBanner" style="display:none;background:rgba(94,122,82,0.15);border:1px solid rgba(94,122,82,0.35);border-radius:2px;padding:0.7rem 1rem;margin-bottom:1rem;font-size:0.82rem;color:var(--ink);">
-      Your dates are held for <strong id="holdTimerText">30:00</strong> — complete the form below to confirm your enquiry.
+      <p style="font-size:0.82rem;color:var(--muted);margin-top:0.3rem">General questions? Send us a message here. To book specific dates, use the availability checker above.</p>
     </div>
     <form id="enquiryForm" action="https://formspree.io/f/mwvzegqj" method="POST">
       <div class="form-row">
@@ -1586,22 +1613,23 @@
   let holdTimerInterval = null;
 
   function startHoldTimer(expiresAtISO) {
-    const banner = document.getElementById('holdTimerBanner');
-    const text = document.getElementById('holdTimerText');
+    const banner = document.getElementById('bpHoldBanner');
+    const text = document.getElementById('bpHoldTimerText');
     if (!banner || !text) return;
     banner.style.display = 'block';
+    banner.style.background = 'rgba(94,122,82,0.18)';
+    banner.style.borderColor = 'rgba(94,122,82,0.35)';
     if (holdTimerInterval) clearInterval(holdTimerInterval);
     const expiresAt = new Date(expiresAtISO).getTime();
     const tick = () => {
       const remaining = expiresAt - Date.now();
       if (remaining <= 0) {
         clearInterval(holdTimerInterval);
-        text.textContent = 'expired';
         banner.style.background = 'rgba(180,80,60,0.15)';
         banner.style.borderColor = 'rgba(180,80,60,0.35)';
         banner.innerHTML = 'Your held dates have expired. Please check availability and try again.';
         activeHold = null;
-        syncCalendar(); // refresh so the freed dates show as available again
+        syncCalendar();
         return;
       }
       const mins = Math.floor(remaining / 60000);
@@ -1622,31 +1650,67 @@
     } catch (e) { /* best-effort — the 30-min expiry and cleanup job are the fallback */ }
   });
 
+  function renderExtraGuestRows(totalGuests) {
+    const wrap = document.getElementById('bpExtraGuestsWrap');
+    wrap.innerHTML = '';
+    const extra = Math.max(0, totalGuests - 1);
+    if (extra === 0) return;
+    wrap.insertAdjacentHTML('beforeend', `<p style="font-size:0.75rem;text-transform:uppercase;letter-spacing:0.08em;color:rgba(247,242,234,0.5);margin-bottom:0.6rem;">Other guests</p>`);
+    for (let i = 0; i < extra; i++) {
+      wrap.insertAdjacentHTML('beforeend', `
+        <div class="bp-row bp-extra-guest" style="margin-bottom:0.75rem;">
+          <div class="bp-field">
+            <label>Guest ${i+2} — full name *</label>
+            <input type="text" class="bp-guest-name" required placeholder="Full name">
+          </div>
+          <div class="bp-field">
+            <label>Adult or child?</label>
+            <select class="bp-guest-type">
+              <option value="adult">Adult</option>
+              <option value="child">Child</option>
+            </select>
+          </div>
+        </div>`);
+    }
+  }
+
   document.getElementById('bpSubmit').addEventListener('click', async () => {
     const ci = document.getElementById('bpCheckin').value;
     const co = document.getElementById('bpCheckout').value;
     if (!ci || !co) { showToast('Please select your dates first.'); return; }
-    const guests = document.getElementById('bpGuests').value;
-    const arr = document.getElementById('enqArrival');
-    const dep = document.getElementById('enqDeparture');
-    const gst = document.getElementById('enqGuests');
-    if (arr) arr.value = ci;
-    if (dep) dep.value = co;
-    if (gst) gst.value = guests + ' guest' + (parseInt(guests) > 1 ? 's' : '');
-    document.getElementById('contact').scrollIntoView({ behavior: 'smooth' });
-    setTimeout(() => {
-      const form = document.getElementById('enquiryForm');
-      if (form) { form.style.transition='box-shadow 0.4s'; form.style.boxShadow='0 0 0 3px var(--sage)'; }
-      setTimeout(() => { if (form) form.style.boxShadow=''; }, 2000);
-      const n = document.getElementById('enqName'); if (n) n.focus();
-    }, 700);
+    const guests = parseInt(document.getElementById('bpGuests').value, 10) || 1;
+
+    // Show the pricing summary for these dates in Step 2
+    const nights = Math.round((new Date(co) - new Date(ci)) / 86400000);
+    let total = 0;
+    for (let i = 0; i < nights; i++) {
+      const d = new Date(ci); d.setDate(d.getDate() + i);
+      total += nightRate(d);
+    }
+    const isWeek = nights >= 7;
+    const finalTotal = total - (isWeek ? Math.round(total * WEEK_DISCOUNT) : 0);
+    const today = new Date(); today.setHours(0,0,0,0);
+    const daysUntil = Math.round((new Date(ci) - today) / 86400000);
+    const isFullPayment = daysUntil < 14;
+    const amountDue = isFullPayment ? finalTotal : Math.round(finalTotal * DEPOSIT_RATE);
+    document.getElementById('bpDateSummaryBox').innerHTML =
+      `${ci} → ${co} · ${nights} night${nights!==1?'s':''} · ${guests} guest${guests!==1?'s':''}<br>` +
+      `Total £${finalTotal} · ${isFullPayment ? 'Full payment due (within 14 days)' : '25% deposit'}: <strong>£${amountDue}</strong>`;
+    document.getElementById('bpPaymentNote').textContent = isFullPayment
+      ? 'Check-in is within 14 days — full payment is required to book'
+      : '25% deposit to secure · balance due before arrival';
+
+    renderExtraGuestRows(guests);
+
+    document.getElementById('bpStep1').style.display = 'none';
+    document.getElementById('bpStep2').style.display = 'block';
 
     // This is the "progress to book now" moment — create the 30-min hold.
     try {
       const res = await fetch(`${SUPABASE_URL}/functions/v1/create-hold`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ checkin: ci, checkout: co, guests_count: parseInt(guests, 10) || null }),
+        body: JSON.stringify({ checkin: ci, checkout: co, guests_count: guests }),
       });
       const data = await res.json();
       if (data.ok) {
@@ -1654,51 +1718,91 @@
         startHoldTimer(data.expires_at);
       } else {
         showToast(data.error || 'Those dates may no longer be available.');
+        document.getElementById('bpStep1').style.display = 'block';
+        document.getElementById('bpStep2').style.display = 'none';
         syncCalendar();
       }
-    } catch (e) { /* if this fails, form still works — create-booking does its own clash check */ }
+    } catch (e) { /* if this fails, the final submit still does its own clash check */ }
   });
 
-  // ─── ENQUIRY FORM ────────────────────────────────────────────────
-  function handleForm(e) {
-    e.preventDefault();
-    showToast('Thank you! We\'ll be in touch within 24 hours. ✓');
-    e.target.reset();
-  }
-
-  // Record a pending direct booking in Supabase alongside the Formspree enquiry.
-  // Runs in parallel — never blocks or breaks the existing Formspree submission.
-  (() => {
-    const form = document.getElementById('enquiryForm');
-    if (!form) return;
-    form.addEventListener('submit', () => {
+  document.getElementById('bpBack').addEventListener('click', () => {
+    document.getElementById('bpStep2').style.display = 'none';
+    document.getElementById('bpStep1').style.display = 'block';
+    if (activeHold) {
       try {
-        if (holdTimerInterval) clearInterval(holdTimerInterval);
-        const banner = document.getElementById('holdTimerBanner');
-        if (banner) banner.style.display = 'none';
-        const guestsRaw = document.getElementById('enqGuests')?.value || '';
-        const guestsCount = parseInt(guestsRaw, 10) || null;
-        const payload = {
-          hold_id: activeHold ? activeHold.id : null,
-          checkin: document.getElementById('enqArrival')?.value || null,
-          checkout: document.getElementById('enqDeparture')?.value || null,
-          first_name: document.getElementById('enqName')?.value || null,
-          last_name: form.querySelector('[name="last_name"]')?.value || null,
-          email: form.querySelector('[name="email"]')?.value || null,
-          phone: form.querySelector('[name="phone"]')?.value || null,
-          guests_count: guestsCount,
-          message: form.querySelector('[name="message"]')?.value || null,
-        };
-        fetch(`${SUPABASE_URL}/functions/v1/create-booking`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-          keepalive: true,
-        }).catch(() => { /* silent — Formspree submission is the fallback of record */ });
-        activeHold = null; // finalized — the pagehide handler must not release this one
-      } catch (e) { /* never block the real form submission */ }
-    });
-  })();
+        navigator.sendBeacon(`${SUPABASE_URL}/functions/v1/release-hold`, new Blob([JSON.stringify({ hold_id: activeHold.id })], { type: 'text/plain;charset=UTF-8' }));
+      } catch (e) {}
+      activeHold = null;
+      if (holdTimerInterval) clearInterval(holdTimerInterval);
+      syncCalendar();
+    }
+  });
+
+  document.getElementById('bpEnquiryForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const submitBtn = document.getElementById('bpFinalSubmit');
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Please wait…';
+
+    const guestRows = Array.from(document.querySelectorAll('.bp-extra-guest')).map(row => ({
+      full_name: row.querySelector('.bp-guest-name').value.trim(),
+      guest_type: row.querySelector('.bp-guest-type').value,
+    })).filter(g => g.full_name);
+
+    const payload = {
+      hold_id: activeHold ? activeHold.id : null,
+      checkin: document.getElementById('bpCheckin').value,
+      checkout: document.getElementById('bpCheckout').value,
+      first_name: document.getElementById('bpFirstName').value,
+      last_name: document.getElementById('bpLastName').value,
+      email: document.getElementById('bpEmail').value,
+      phone: document.getElementById('bpPhone').value,
+      address_line1: document.getElementById('bpAddr1').value,
+      address_line2: document.getElementById('bpAddr2').value,
+      city: document.getElementById('bpCity').value,
+      postcode: document.getElementById('bpPostcode').value,
+      country: document.getElementById('bpCountry').value,
+      has_dog: document.getElementById('bpHasDog').checked,
+      guests: guestRows,
+      message: document.getElementById('bpMessage').value,
+    };
+
+    try {
+      const bookRes = await fetch(`${SUPABASE_URL}/functions/v1/create-booking`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const bookData = await bookRes.json();
+      if (!bookData.ok) {
+        showToast(bookData.error || 'Something went wrong — please try again.');
+        submitBtn.disabled = false; submitBtn.textContent = 'Continue to Payment';
+        return;
+      }
+
+      if (holdTimerInterval) clearInterval(holdTimerInterval);
+      activeHold = null; // finalized — pagehide handler must not release this one
+      document.getElementById('bpEnquiryForm').style.display = 'none';
+      document.getElementById('bpSuccess').style.display = 'block';
+
+      const payRes = await fetch(`${SUPABASE_URL}/functions/v1/create-checkout-session`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ booking_id: bookData.booking_id, return_origin: window.location.origin }),
+      });
+      const payData = await payRes.json();
+      if (payData.ok && payData.checkout_url) {
+        window.location.href = payData.checkout_url;
+      } else {
+        document.getElementById('bpSuccess').innerHTML =
+          `<p style="color:var(--cream)">Your booking is saved, but payment setup isn't ready yet.</p>
+           <p style="font-size:0.82rem;color:rgba(247,242,234,0.6)">We'll be in touch shortly to arrange payment — ${payData.error || ''}</p>`;
+      }
+    } catch (e) {
+      showToast('Something went wrong — please try again or contact us directly.');
+      submitBtn.disabled = false; submitBtn.textContent = 'Continue to Payment';
+    }
+  });
 
   // ─── TOAST ──────────────────────────────────────────────────────
   function showToast(msg) {

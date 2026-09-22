@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Booking Confirmed — Cringley Cottage</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --ink: #232120; --cream: #f3ede3; --stone: #dfd8cb;
+    --sage: #5e7a52; --sage-light: #84a472; --muted: #7a6f60;
+  }
+  body {
+    font-family: 'DM Sans', sans-serif; background: var(--ink); color: var(--cream);
+    min-height: 100vh; display: flex; align-items: center; justify-content: center;
+    padding: 2rem 6%; line-height: 1.75; text-align: center;
+  }
+  .check { font-size: 3rem; color: var(--sage-light); margin-bottom: 1rem; }
+  h1 { font-family: 'Cormorant Garamond', serif; font-weight: 600; font-size: 2.2rem; margin-bottom: 0.8rem; }
+  p { color: rgba(247,242,234,0.7); max-width: 480px; margin: 0 auto 0.8rem; }
+  a.btn {
+    display: inline-block; margin-top: 1.5rem; background: var(--sage); color: var(--cream);
+    text-decoration: none; padding: 0.85rem 1.8rem; border-radius: 2px;
+    font-size: 0.8rem; letter-spacing: 0.08em; text-transform: uppercase;
+    transition: background 0.2s;
+  }
+  a.btn:hover { background: var(--sage-light); }
+  #status { font-size: 0.82rem; color: rgba(247,242,234,0.45); margin-top: 2rem; }
+</style>
+</head>
+<body>
+  <div>
+    <div class="check">&#10003;</div>
+    <h1>Payment received</h1>
+    <p>Thank you — your booking at Cringley Cottage is confirmed. A confirmation email will follow shortly.</p>
+    <p id="status">Finalizing your confirmation…</p>
+    <a href="index.html" class="btn">Back to site</a>
+  </div>
+  <script>
+    // Purely cosmetic status check — the booking was already confirmed
+    // server-side by Stripe's webhook, not by this page loading.
+    const params = new URLSearchParams(window.location.search);
+    const sessionId = params.get('session_id');
+    const statusEl = document.getElementById('status');
+    if (sessionId) {
+      statusEl.textContent = 'Booking reference: ' + sessionId.slice(-12);
+    } else {
+      statusEl.style.display = 'none';
+    }
+  </script>
+</body>
+</html>
