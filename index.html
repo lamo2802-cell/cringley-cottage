@@ -1252,6 +1252,9 @@
       <span class="form-step-label">Enquiry Form</span>
       <p style="font-size:0.82rem;color:var(--muted);margin-top:0.3rem">Your dates are pre-filled if you used the availability checker above.</p>
     </div>
+    <div id="holdTimerBanner" style="display:none;background:rgba(94,122,82,0.15);border:1px solid rgba(94,122,82,0.35);border-radius:2px;padding:0.7rem 1rem;margin-bottom:1rem;font-size:0.82rem;color:var(--ink);">
+      Your dates are held for <strong id="holdTimerText">30:00</strong> — complete the form below to confirm your enquiry.
+    </div>
     <form id="enquiryForm" action="https://formspree.io/f/mwvzegqj" method="POST">
       <div class="form-row">
         <div class="form-group">
@@ -1579,7 +1582,37 @@
   document.getElementById('bpCheckin').addEventListener('change', updateSummary);
   document.getElementById('bpCheckout').addEventListener('change', updateSummary);
 
-  document.getElementById('bpSubmit').addEventListener('click', () => {
+  let activeHold = null; // { id, expiresAt }
+  let holdTimerInterval = null;
+
+  function startHoldTimer(expiresAtISO) {
+    const banner = document.getElementById('holdTimerBanner');
+    const text = document.getElementById('holdTimerText');
+    if (!banner || !text) return;
+    banner.style.display = 'block';
+    if (holdTimerInterval) clearInterval(holdTimerInterval);
+    const expiresAt = new Date(expiresAtISO).getTime();
+    const tick = () => {
+      const remaining = expiresAt - Date.now();
+      if (remaining <= 0) {
+        clearInterval(holdTimerInterval);
+        text.textContent = 'expired';
+        banner.style.background = 'rgba(180,80,60,0.15)';
+        banner.style.borderColor = 'rgba(180,80,60,0.35)';
+        banner.innerHTML = 'Your held dates have expired. Please check availability and try again.';
+        activeHold = null;
+        syncCalendar(); // refresh so the freed dates show as available again
+        return;
+      }
+      const mins = Math.floor(remaining / 60000);
+      const secs = Math.floor((remaining % 60000) / 1000);
+      text.textContent = `${mins}:${secs.toString().padStart(2,'0')}`;
+    };
+    tick();
+    holdTimerInterval = setInterval(tick, 1000);
+  }
+
+  document.getElementById('bpSubmit').addEventListener('click', async () => {
     const ci = document.getElementById('bpCheckin').value;
     const co = document.getElementById('bpCheckout').value;
     if (!ci || !co) { showToast('Please select your dates first.'); return; }
@@ -1597,6 +1630,23 @@
       setTimeout(() => { if (form) form.style.boxShadow=''; }, 2000);
       const n = document.getElementById('enqName'); if (n) n.focus();
     }, 700);
+
+    // This is the "progress to book now" moment — create the 30-min hold.
+    try {
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/create-hold`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ checkin: ci, checkout: co, guests_count: parseInt(guests, 10) || null }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        activeHold = { id: data.hold_id, expiresAt: data.expires_at };
+        startHoldTimer(data.expires_at);
+      } else {
+        showToast(data.error || 'Those dates may no longer be available.');
+        syncCalendar();
+      }
+    } catch (e) { /* if this fails, form still works — create-booking does its own clash check */ }
   });
 
   // ─── ENQUIRY FORM ────────────────────────────────────────────────
@@ -1613,9 +1663,13 @@
     if (!form) return;
     form.addEventListener('submit', () => {
       try {
+        if (holdTimerInterval) clearInterval(holdTimerInterval);
+        const banner = document.getElementById('holdTimerBanner');
+        if (banner) banner.style.display = 'none';
         const guestsRaw = document.getElementById('enqGuests')?.value || '';
         const guestsCount = parseInt(guestsRaw, 10) || null;
         const payload = {
+          hold_id: activeHold ? activeHold.id : null,
           checkin: document.getElementById('enqArrival')?.value || null,
           checkout: document.getElementById('enqDeparture')?.value || null,
           first_name: document.getElementById('enqName')?.value || null,
