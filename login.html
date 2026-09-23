@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sign In — Cringley Cottage</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --ink: #232120; --cream: #f3ede3; --stone: #dfd8cb;
+    --sage: #5e7a52; --sage-light: #84a472; --muted: #7a6f60;
+  }
+  body {
+    font-family: 'DM Sans', sans-serif; background: var(--ink); color: var(--cream);
+    min-height: 100vh; display: flex; align-items: center; justify-content: center;
+    padding: 2rem 6%;
+  }
+  .box { width: 100%; max-width: 380px; }
+  h1 { font-family: 'Cormorant Garamond', serif; font-weight: 600; font-size: 1.9rem; margin-bottom: 0.4rem; text-align: center; }
+  p.sub { text-align: center; color: rgba(247,242,234,0.5); font-size: 0.85rem; margin-bottom: 2rem; }
+  label { display: block; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; color: rgba(247,242,234,0.55); margin-bottom: 0.4rem; }
+  input {
+    width: 100%; background: rgba(247,242,234,0.07); border: 1px solid rgba(247,242,234,0.15);
+    color: var(--cream); padding: 0.75rem 0.9rem; font-family: 'DM Sans', sans-serif;
+    font-size: 0.9rem; border-radius: 2px; outline: none; margin-bottom: 1.1rem;
+    transition: border-color 0.2s;
+  }
+  input:focus { border-color: var(--sage); }
+  button {
+    width: 100%; background: var(--sage); color: var(--cream); border: none;
+    padding: 0.85rem; font-size: 0.8rem; letter-spacing: 0.08em; text-transform: uppercase;
+    border-radius: 2px; cursor: pointer; transition: background 0.2s;
+  }
+  button:hover { background: var(--sage-light); }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+  #err {
+    display: none; background: rgba(180,80,60,0.15); border: 1px solid rgba(180,80,60,0.35);
+    color: rgba(247,242,234,0.9); font-size: 0.82rem; padding: 0.7rem 0.9rem;
+    border-radius: 2px; margin-bottom: 1.1rem;
+  }
+  a.back { display: block; text-align: center; margin-top: 1.5rem; color: rgba(247,242,234,0.4); font-size: 0.78rem; text-decoration: none; }
+</style>
+</head>
+<body>
+  <div class="box">
+    <h1>Cringley Cottage</h1>
+    <p class="sub">Sign in to manage prices</p>
+    <div id="err"></div>
+    <form id="loginForm">
+      <label>Email</label>
+      <input type="email" id="email" required autocomplete="username">
+      <label>Password</label>
+      <input type="password" id="password" required autocomplete="current-password">
+      <button type="submit" id="submitBtn">Sign In</button>
+    </form>
+    <a href="index.html" class="back">&#8592; Back to site</a>
+  </div>
+
+  <script>
+    const SUPABASE_URL = 'https://yfeyswuxhgezkpcjhznp.supabase.co';
+    const SUPABASE_ANON_KEY = 'sb_publishable_96mc6z7EpkjnKPsMX0z5Ug_BJ7MDBNp';
+
+    // Already signed in? Skip straight to admin.
+    if (localStorage.getItem('cc_session')) {
+      window.location.href = 'admin.html';
+    }
+
+    document.getElementById('loginForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const btn = document.getElementById('submitBtn');
+      const errBox = document.getElementById('err');
+      errBox.style.display = 'none';
+      btn.disabled = true; btn.textContent = 'Signing in…';
+
+      try {
+        const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY },
+          body: JSON.stringify({
+            email: document.getElementById('email').value.trim(),
+            password: document.getElementById('password').value,
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          errBox.textContent = data.error_description || data.msg || 'Sign in failed — check your email and password.';
+          errBox.style.display = 'block';
+          btn.disabled = false; btn.textContent = 'Sign In';
+          return;
+        }
+        localStorage.setItem('cc_session', JSON.stringify({
+          access_token: data.access_token,
+          refresh_token: data.refresh_token,
+          expires_at: Date.now() + (data.expires_in * 1000),
+        }));
+        window.location.href = 'admin.html';
+      } catch (e) {
+        errBox.textContent = 'Something went wrong — please try again.';
+        errBox.style.display = 'block';
+        btn.disabled = false; btn.textContent = 'Sign In';
+      }
+    });
+  </script>
+</body>
+</html>

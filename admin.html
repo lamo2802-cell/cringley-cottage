@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Manage Prices — Cringley Cottage</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --ink: #232120; --cream: #f3ede3; --stone: #dfd8cb;
+    --sage: #5e7a52; --sage-light: #84a472; --muted: #7a6f60;
+  }
+  body { font-family: 'DM Sans', sans-serif; background: var(--stone); color: var(--ink); min-height: 100vh; }
+  header {
+    background: var(--ink); color: var(--cream); padding: 1.2rem 6%;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  header h1 { font-family: 'Cormorant Garamond', serif; font-weight: 600; font-size: 1.4rem; }
+  header a, header button {
+    background: none; border: 1px solid rgba(247,242,234,0.25); color: var(--cream);
+    font-family: 'DM Sans', sans-serif; font-size: 0.78rem; letter-spacing: 0.05em;
+    padding: 0.5rem 1rem; border-radius: 2px; cursor: pointer; text-decoration: none; margin-left: 0.6rem;
+  }
+  header a:hover, header button:hover { border-color: var(--sage-light); color: var(--sage-light); }
+  main { max-width: 900px; margin: 0 auto; padding: 2.5rem 6%; }
+  h2 { font-family: 'Cormorant Garamond', serif; font-weight: 600; font-size: 1.6rem; margin-bottom: 0.3rem; }
+  p.sub { color: var(--muted); font-size: 0.88rem; margin-bottom: 1.8rem; }
+  table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 4px; overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
+  th, td { text-align: left; padding: 0.7rem 0.9rem; font-size: 0.85rem; border-bottom: 1px solid rgba(0,0,0,0.06); }
+  th { background: rgba(94,122,82,0.1); font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+  td input {
+    width: 100%; border: 1px solid rgba(0,0,0,0.12); border-radius: 2px; padding: 0.4rem 0.5rem;
+    font-family: 'DM Sans', sans-serif; font-size: 0.85rem; background: #fff;
+  }
+  .row-actions { white-space: nowrap; }
+  .row-actions button {
+    background: none; border: none; cursor: pointer; font-size: 0.78rem; padding: 0.3rem 0.5rem;
+    color: var(--sage); font-family: 'DM Sans', sans-serif;
+  }
+  .row-actions button.danger { color: #b4503c; }
+  .row-actions button:hover { text-decoration: underline; }
+  #addForm {
+    margin-top: 1.5rem; background: #fff; border-radius: 4px; padding: 1.4rem;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+  }
+  #addForm h3 { font-family: 'Cormorant Garamond', serif; font-size: 1.15rem; margin-bottom: 1rem; }
+  .form-grid { display: grid; grid-template-columns: 1.4fr 1fr 1fr 0.8fr 0.8fr auto; gap: 0.7rem; align-items: end; }
+  .form-grid label { display: block; font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); margin-bottom: 0.3rem; }
+  .form-grid input {
+    width: 100%; border: 1px solid rgba(0,0,0,0.15); border-radius: 2px; padding: 0.55rem 0.6rem;
+    font-family: 'DM Sans', sans-serif; font-size: 0.85rem;
+  }
+  .form-grid button {
+    background: var(--sage); color: var(--cream); border: none; padding: 0.6rem 1.1rem;
+    border-radius: 2px; cursor: pointer; font-size: 0.8rem; white-space: nowrap;
+  }
+  .form-grid button:hover { background: var(--sage-light); }
+  @media (max-width: 800px) {
+    .form-grid { grid-template-columns: 1fr 1fr; }
+    table, thead, tbody, th, td, tr { display: block; }
+    thead { display: none; }
+    tr { margin-bottom: 1rem; border: 1px solid rgba(0,0,0,0.08); border-radius: 4px; padding: 0.6rem; }
+    td { border: none; padding: 0.35rem 0; }
+    td::before { content: attr(data-label); display: block; font-size: 0.65rem; text-transform: uppercase; color: var(--muted); margin-bottom: 0.15rem; }
+  }
+  #msg { display: none; padding: 0.7rem 1rem; border-radius: 2px; font-size: 0.85rem; margin-bottom: 1rem; }
+  #msg.ok { background: rgba(94,122,82,0.12); border: 1px solid rgba(94,122,82,0.3); color: #3d5233; }
+  #msg.error { background: rgba(180,80,60,0.1); border: 1px solid rgba(180,80,60,0.3); color: #7a3325; }
+  #loading { padding: 2rem 0; text-align: center; color: var(--muted); }
+</style>
+</head>
+<body>
+  <header>
+    <h1>Cringley Cottage — Prices</h1>
+    <div>
+      <a href="index.html">View Site</a>
+      <button id="logoutBtn">Log Out</button>
+    </div>
+  </header>
+  <main>
+    <h2>Seasonal Rates</h2>
+    <p class="sub">These prices drive the booking calendar and payment amounts live on the site — changes take effect immediately.</p>
+    <div id="msg"></div>
+    <div id="loading">Loading rates…</div>
+    <table id="ratesTable" style="display:none">
+      <thead>
+        <tr><th>Label</th><th>From</th><th>To</th><th>£/night</th><th>Min nights</th><th></th></tr>
+      </thead>
+      <tbody id="ratesBody"></tbody>
+    </table>
+
+    <div id="addForm">
+      <h3>Add a rate band</h3>
+      <div class="form-grid">
+        <div><label>Label</label><input type="text" id="newLabel" placeholder="e.g. Peak summer"></div>
+        <div><label>From</label><input type="date" id="newFrom"></div>
+        <div><label>To</label><input type="date" id="newTo"></div>
+        <div><label>£/night</label><input type="number" id="newRate" min="1"></div>
+        <div><label>Min nights</label><input type="number" id="newMinNights" value="2" min="1"></div>
+        <button id="addBtn">Add</button>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    const SUPABASE_URL = 'https://yfeyswuxhgezkpcjhznp.supabase.co';
+    const SUPABASE_ANON_KEY = 'sb_publishable_96mc6z7EpkjnKPsMX0z5Ug_BJ7MDBNp';
+
+    function getSession() {
+      try { return JSON.parse(localStorage.getItem('cc_session')); } catch { return null; }
+    }
+    function clearSession() { localStorage.removeItem('cc_session'); }
+
+    let session = getSession();
+    if (!session) window.location.href = 'login.html';
+
+    async function refreshSession() {
+      const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=refresh_token`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY },
+        body: JSON.stringify({ refresh_token: session.refresh_token }),
+      });
+      if (!res.ok) { clearSession(); window.location.href = 'login.html'; return null; }
+      const data = await res.json();
+      session = { access_token: data.access_token, refresh_token: data.refresh_token, expires_at: Date.now() + data.expires_in * 1000 };
+      localStorage.setItem('cc_session', JSON.stringify(session));
+      return session;
+    }
+
+    async function authFetch(path, options = {}) {
+      if (!session.access_token || Date.now() > session.expires_at - 60000) {
+        await refreshSession();
+        if (!session) return null;
+      }
+      const res = await fetch(`${SUPABASE_URL}${path}`, {
+        ...options,
+        headers: {
+          'apikey': SUPABASE_ANON_KEY,
+          'Authorization': `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
+          ...(options.headers || {}),
+        },
+      });
+      if (res.status === 401) {
+        const refreshed = await refreshSession();
+        if (!refreshed) return null;
+        return authFetch(path, options);
+      }
+      return res;
+    }
+
+    function showMsg(text, ok) {
+      const el = document.getElementById('msg');
+      el.textContent = text;
+      el.className = ok ? 'ok' : 'error';
+      el.style.display = 'block';
+      setTimeout(() => { el.style.display = 'none'; }, 4000);
+    }
+
+    function rowHtml(r) {
+      return `
+        <tr data-id="${r.id}">
+          <td data-label="Label"><input type="text" class="f-label" value="${r.label ?? ''}"></td>
+          <td data-label="From"><input type="date" class="f-from" value="${r.date_from}"></td>
+          <td data-label="To"><input type="date" class="f-to" value="${r.date_to}"></td>
+          <td data-label="£/night"><input type="number" class="f-rate" value="${r.nightly_rate}"></td>
+          <td data-label="Min nights"><input type="number" class="f-min" value="${r.min_nights}"></td>
+          <td class="row-actions">
+            <button class="saveBtn">Save</button>
+            <button class="danger deleteBtn">Delete</button>
+          </td>
+        </tr>`;
+    }
+
+    async function loadRates() {
+      const res = await authFetch('/rest/v1/rates?select=*&order=date_from.asc');
+      if (!res) return;
+      const rows = await res.json();
+      document.getElementById('ratesBody').innerHTML = rows.map(rowHtml).join('');
+      document.getElementById('loading').style.display = 'none';
+      document.getElementById('ratesTable').style.display = 'table';
+    }
+
+    document.getElementById('ratesBody').addEventListener('click', async (e) => {
+      const tr = e.target.closest('tr');
+      if (!tr) return;
+      const id = tr.dataset.id;
+
+      if (e.target.classList.contains('saveBtn')) {
+        const body = {
+          label: tr.querySelector('.f-label').value,
+          date_from: tr.querySelector('.f-from').value,
+          date_to: tr.querySelector('.f-to').value,
+          nightly_rate: parseFloat(tr.querySelector('.f-rate').value),
+          min_nights: parseInt(tr.querySelector('.f-min').value, 10),
+        };
+        const res = await authFetch(`/rest/v1/rates?id=eq.${id}`, { method: 'PATCH', body: JSON.stringify(body) });
+        if (res && res.ok) showMsg('Saved.', true); else showMsg('Save failed.', false);
+      }
+
+      if (e.target.classList.contains('deleteBtn')) {
+        if (!confirm('Delete this rate band?')) return;
+        const res = await authFetch(`/rest/v1/rates?id=eq.${id}`, { method: 'DELETE' });
+        if (res && res.ok) { tr.remove(); showMsg('Deleted.', true); } else showMsg('Delete failed.', false);
+      }
+    });
+
+    document.getElementById('addBtn').addEventListener('click', async () => {
+      const body = {
+        label: document.getElementById('newLabel').value,
+        date_from: document.getElementById('newFrom').value,
+        date_to: document.getElementById('newTo').value,
+        nightly_rate: parseFloat(document.getElementById('newRate').value),
+        min_nights: parseInt(document.getElementById('newMinNights').value, 10) || 2,
+      };
+      if (!body.date_from || !body.date_to || !body.nightly_rate) { showMsg('Fill in from, to, and £/night at least.', false); return; }
+      const res = await authFetch('/rest/v1/rates', { method: 'POST', headers: { 'Prefer': 'return=representation' }, body: JSON.stringify(body) });
+      if (res && res.ok) {
+        showMsg('Added.', true);
+        ['newLabel','newFrom','newTo','newRate'].forEach(id => document.getElementById(id).value = '');
+        document.getElementById('newMinNights').value = 2;
+        loadRates();
+      } else showMsg('Add failed — check the dates and try again.', false);
+    });
+
+    document.getElementById('logoutBtn').addEventListener('click', () => {
+      clearSession();
+      window.location.href = 'login.html';
+    });
+
+    loadRates();
+  </script>
+</body>
+</html>

@@ -1378,9 +1378,11 @@
   // CRINGLEY COTTAGE — SITE JAVASCRIPT
   // ═══════════════════════════════════════════════════════════════
 
-  // ─── GOOGLE SHEETS PRICING ──────────────────────────────────────
-  const RATES_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSVurb9lolbKBibLvNcDjCMnicIHXtrfQB-Fe3C824upOzLMGEzyx4SStvUT8pW1ney-9KbRtimz-yL/pub?gid=0&single=true&output=csv';
+  // ─── SUPABASE ───────────────────────────────────────────────────
+  const SUPABASE_URL = 'https://yfeyswuxhgezkpcjhznp.supabase.co';
+  const SUPABASE_ANON_KEY = 'sb_publishable_96mc6z7EpkjnKPsMX0z5Ug_BJ7MDBNp';
 
+  // ─── PRICING (managed via /admin.html, stored in Supabase) ──────
   const RATES_FALLBACK = [
     { label: 'Low season',   from: '2026-04-19', to: '2026-05-31', rate: 120, minNights: 2 },
     { label: 'Peak summer',  from: '2026-06-01', to: '2026-08-31', rate: 160, minNights: 3 },
@@ -1397,18 +1399,19 @@
   const DEPOSIT_RATE  = 0.25;
 
   async function loadRatesFromSheet() {
-    if (!RATES_CSV_URL) return;
     try {
       const ctrl = new AbortController();
       setTimeout(() => ctrl.abort(), 5000);
-      const res = await fetch(RATES_CSV_URL, { signal: ctrl.signal });
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/rates?select=label,date_from,date_to,nightly_rate,min_nights&order=date_from.asc`, {
+        signal: ctrl.signal,
+        headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` },
+      });
       if (!res.ok) throw new Error('HTTP ' + res.status);
-      const text = await res.text();
-      const rows = text.trim().split('\n').slice(1);
-      const parsed = rows.map(row => {
-        const cols = (row.match(/(".*?"|[^,\n]+)/g) || []).map(x => x.replace(/^"|"$/g,'').trim());
-        return { label: cols[0]||'', from: cols[1]||'', to: cols[2]||'', rate: parseInt(cols[3])||0, minNights: parseInt(cols[4])||2 };
-      }).filter(r => r.from && r.to && r.rate > 0);
+      const rows = await res.json();
+      const parsed = rows.map(r => ({
+        label: r.label || '', from: r.date_from, to: r.date_to,
+        rate: r.nightly_rate, minNights: r.min_nights,
+      })).filter(r => r.from && r.to && r.rate > 0);
       if (parsed.length > 0) RATES = parsed;
     } catch(e) { /* use fallback */ }
   }
@@ -1421,8 +1424,6 @@
   function getMinNights(date)  { return getRateEntry(date).minNights; }
 
   // ─── AVAILABILITY (Supabase) ─────────────────────────────────────
-  const SUPABASE_URL = 'https://yfeyswuxhgezkpcjhznp.supabase.co';
-  const SUPABASE_ANON_KEY = 'sb_publishable_96mc6z7EpkjnKPsMX0z5Ug_BJ7MDBNp';
   let bookedRanges = [];
 
   async function syncCalendar() {
