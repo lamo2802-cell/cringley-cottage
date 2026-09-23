@@ -27,7 +27,7 @@
   main { max-width: 900px; margin: 0 auto; padding: 2.5rem 6%; }
   h2 { font-family: 'Cormorant Garamond', serif; font-weight: 600; font-size: 1.6rem; margin-bottom: 0.3rem; }
   p.sub { color: var(--muted); font-size: 0.88rem; margin-bottom: 1.8rem; }
-  table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 4px; overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
+  table { width: 100%; table-layout: fixed; border-collapse: collapse; background: #fff; border-radius: 4px; overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
   th, td { text-align: left; padding: 0.7rem 0.9rem; font-size: 0.85rem; border-bottom: 1px solid rgba(0,0,0,0.06); }
   th { background: rgba(94,122,82,0.1); font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
   td input {
@@ -85,6 +85,10 @@
     <div id="msg"></div>
     <div id="loading">Loading rates…</div>
     <table id="ratesTable" style="display:none">
+      <colgroup>
+        <col style="width:22%"><col style="width:16%"><col style="width:16%">
+        <col style="width:14%"><col style="width:13%"><col style="width:19%">
+      </colgroup>
       <thead>
         <tr><th>Label</th><th>From</th><th>To</th><th>£/night</th><th>Min nights</th><th></th></tr>
       </thead>
