@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fire Safety Checklist — Cringley Cottage</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --ink: #232120; --cream: #f3ede3; --stone: #dfd8cb;
+    --sage: #5e7a52; --sage-light: #84a472; --muted: #7a6f60;
+  }
+  body { font-family: 'DM Sans', sans-serif; background: var(--stone); color: var(--ink); min-height: 100vh; }
+  header {
+    background: var(--ink); color: var(--cream); padding: 1.2rem 6%;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  header h1 { font-family: 'Cormorant Garamond', serif; font-weight: 600; font-size: 1.3rem; }
+  header button {
+    background: none; border: 1px solid rgba(247,242,234,0.25); color: var(--cream);
+    font-family: 'DM Sans', sans-serif; font-size: 0.78rem; padding: 0.5rem 1rem;
+    border-radius: 2px; cursor: pointer;
+  }
+  header button:hover { border-color: var(--sage-light); color: var(--sage-light); }
+  main { max-width: 640px; margin: 0 auto; padding: 2rem 6% 4rem; }
+  .card { background: #fff; border-radius: 4px; padding: 1.4rem 1.5rem; margin-bottom: 1.3rem; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
+  h2 { font-family: 'Cormorant Garamond', serif; font-weight: 600; font-size: 1.3rem; margin-bottom: 1rem; }
+  label { display: block; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin-bottom: 0.3rem; }
+  input[type=text], input[type=date], select, textarea {
+    width: 100%; border: 1px solid rgba(0,0,0,0.15); border-radius: 2px; padding: 0.6rem 0.7rem;
+    font-family: 'DM Sans', sans-serif; font-size: 0.88rem; margin-bottom: 1rem; background: #fff;
+  }
+  .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.9rem; }
+  @media (max-width: 560px) { .field-row { grid-template-columns: 1fr; } }
+  .item {
+    padding: 0.9rem 0; border-bottom: 1px solid rgba(0,0,0,0.06);
+  }
+  .item:last-child { border-bottom: none; }
+  .item p { font-size: 0.9rem; margin-bottom: 0.6rem; }
+  .item .options { display: flex; gap: 1.4rem; }
+  .item label.opt { display: flex; align-items: center; gap: 0.4rem; font-size: 0.85rem; text-transform: none; letter-spacing: normal; color: var(--ink); margin: 0; cursor: pointer; }
+  .item input[type=radio] { width: 17px; height: 17px; accent-color: var(--sage); cursor: pointer; }
+  .action-row { display: grid; grid-template-columns: 2fr 1fr 1fr auto; gap: 0.6rem; margin-bottom: 0.7rem; align-items: center; }
+  @media (max-width: 560px) { .action-row { grid-template-columns: 1fr; } }
+  .action-row input { margin-bottom: 0; }
+  .action-row button { background: none; border: none; color: #b4503c; cursor: pointer; font-size: 0.8rem; }
+  #addActionBtn {
+    background: none; border: 1px dashed rgba(0,0,0,0.2); color: var(--muted);
+    padding: 0.5rem; width: 100%; border-radius: 2px; cursor: pointer; font-size: 0.82rem; margin-top: 0.3rem;
+  }
+  #submitBtn {
+    width: 100%; background: var(--sage); color: var(--cream); border: none;
+    padding: 0.9rem; font-size: 0.85rem; letter-spacing: 0.06em; text-transform: uppercase;
+    border-radius: 2px; cursor: pointer;
+  }
+  #submitBtn:hover { background: var(--sage-light); }
+  #submitBtn:disabled { opacity: 0.5; cursor: not-allowed; }
+  #msg { display: none; padding: 0.8rem 1rem; border-radius: 2px; font-size: 0.88rem; margin-bottom: 1.3rem; }
+  #msg.ok { background: rgba(94,122,82,0.12); border: 1px solid rgba(94,122,82,0.3); color: #3d5233; }
+  #msg.error { background: rgba(180,80,60,0.1); border: 1px solid rgba(180,80,60,0.3); color: #7a3325; }
+  .recent { font-size: 0.85rem; }
+  .recent-row { display: flex; justify-content: space-between; padding: 0.5rem 0; border-bottom: 1px solid rgba(0,0,0,0.06); }
+  .recent-row:last-child { border-bottom: none; }
+</style>
+</head>
+<body>
+  <header>
+    <h1>Fire Safety Checklist</h1>
+    <button id="logoutBtn">Log Out</button>
+  </header>
+  <main>
+    <div id="msg"></div>
+
+    <form id="checkForm">
+      <div class="card">
+        <h2>Check Details</h2>
+        <div class="field-row">
+          <div>
+            <label>Date</label>
+            <input type="date" id="checkDate" required>
+          </div>
+          <div>
+            <label>Type of check</label>
+            <select id="checkType">
+              <option value="change_of_occupancy">Change of occupancy</option>
+              <option value="daily">Daily</option>
+              <option value="weekly">Weekly</option>
+              <option value="monthly">Monthly</option>
+              <option value="six_monthly">Six-monthly</option>
+            </select>
+          </div>
+        </div>
+        <label>Inspected by</label>
+        <input type="text" id="inspectedBy" required placeholder="Your name">
+      </div>
+
+      <div class="card" id="itemsCard">
+        <h2>Fire Safety Measures</h2>
+        <div id="itemsWrap"></div>
+      </div>
+
+      <div class="card">
+        <h2>Actions Needed</h2>
+        <p style="font-size:0.82rem;color:var(--muted);margin-bottom:0.9rem;">Only needed if anything above was marked "No" — what needs doing, by whom, and when.</p>
+        <div id="actionsWrap"></div>
+        <button type="button" id="addActionBtn">+ Add action</button>
+      </div>
+
+      <div class="card">
+        <label>Notes (optional)</label>
+        <textarea id="notes" rows="3" style="margin-bottom:0"></textarea>
+      </div>
+
+      <button type="submit" id="submitBtn">Submit Checklist</button>
+    </form>
+
+    <div class="card" style="margin-top:2rem;">
+      <h2>Your Recent Submissions</h2>
+      <div id="recentWrap" class="recent"><p style="color:var(--muted)">Loading…</p></div>
+    </div>
+  </main>
+
+  <script>
+    const SUPABASE_URL = 'https://yfeyswuxhgezkpcjhznp.supabase.co';
+    const SUPABASE_ANON_KEY = 'sb_publishable_96mc6z7EpkjnKPsMX0z5Ug_BJ7MDBNp';
+
+    const ITEMS = [
+      'Has the fire alarm been tested?',
+      'Are all fire escape doors easily opened and clear on inside and outside?',
+      'Are fire exit routes clear – free from obstructions?',
+      'Are fire extinguishers stored in the correct location?',
+      'Do fire points have the required signage?',
+      'Are the anti-tamper seals of extinguishers intact?',
+      'If possible, have the pressure of the contents of fire extinguishers been checked?',
+      'Are adequate emergency escape route signs displayed – green running man?',
+      'Are fire action notices displayed at various locations – fire alarm call points etc.?',
+      'Have emergency lights been inspected – tell-tale lights illuminated?',
+      'Where required, are there spare batteries for emergency escape lights and torches?',
+      'Are all occupants/guests aware of the fire and emergency procedures?',
+    ];
+
+    function getSession() { try { return JSON.parse(localStorage.getItem('cc_session')); } catch { return null; } }
+    function clearSession() { localStorage.removeItem('cc_session'); }
+    let session = getSession();
+    if (!session) window.location.href = 'login.html';
+
+    async function refreshSession() {
+      const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=refresh_token`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY },
+        body: JSON.stringify({ refresh_token: session.refresh_token }),
+      });
+      if (!res.ok) { clearSession(); window.location.href = 'login.html'; return null; }
+      const data = await res.json();
+      const role = data.user?.app_metadata?.role || session.role || null;
+      session = { access_token: data.access_token, refresh_token: data.refresh_token, expires_at: Date.now() + data.expires_in * 1000, role, user_id: data.user?.id || session.user_id || null };
+      localStorage.setItem('cc_session', JSON.stringify(session));
+      return session;
+    }
+
+    async function authFetch(path, options = {}) {
+      if (!session.access_token || Date.now() > session.expires_at - 60000) {
+        await refreshSession();
+        if (!session) return null;
+      }
+      const res = await fetch(`${SUPABASE_URL}${path}`, {
+        ...options,
+        headers: {
+          'apikey': SUPABASE_ANON_KEY,
+          'Authorization': `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
+          ...(options.headers || {}),
+        },
+      });
+      if (res.status === 401) {
+        const refreshed = await refreshSession();
+        if (!refreshed) return null;
+        return authFetch(path, options);
+      }
+      return res;
+    }
+
+    // ─── Build the 12-item checklist ───────────────────────────────
+    const itemsWrap = document.getElementById('itemsWrap');
+    ITEMS.forEach((label, i) => {
+      const n = i + 1;
+      itemsWrap.insertAdjacentHTML('beforeend', `
+        <div class="item">
+          <p>${n}. ${label}</p>
+          <div class="options">
+            <label class="opt"><input type="radio" name="item${n}" value="yes" required> Yes</label>
+            <label class="opt"><input type="radio" name="item${n}" value="no"> No</label>
+            <label class="opt"><input type="radio" name="item${n}" value="na"> N/A</label>
+          </div>
+        </div>`);
+    });
+
+    // ─── Dynamic action rows ────────────────────────────────────────
+    function addActionRow() {
+      const wrap = document.getElementById('actionsWrap');
+      const row = document.createElement('div');
+      row.className = 'action-row';
+      row.innerHTML = `
+        <input type="text" class="a-action" placeholder="Action needed">
+        <input type="text" class="a-who" placeholder="By whom">
+        <input type="date" class="a-when">
+        <button type="button" title="Remove">✕</button>`;
+      row.querySelector('button').addEventListener('click', () => row.remove());
+      wrap.appendChild(row);
+    }
+    document.getElementById('addActionBtn').addEventListener('click', addActionRow);
+
+    // Default date to today
+    document.getElementById('checkDate').value = new Date().toISOString().slice(0, 10);
+
+    function showMsg(text, ok) {
+      const el = document.getElementById('msg');
+      el.textContent = text;
+      el.className = ok ? 'ok' : 'error';
+      el.style.display = 'block';
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    document.getElementById('checkForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const btn = document.getElementById('submitBtn');
+      btn.disabled = true; btn.textContent = 'Submitting…';
+
+      const items = ITEMS.map((label, i) => {
+        const n = i + 1;
+        const checked = document.querySelector(`input[name="item${n}"]:checked`);
+        return { n, label, answer: checked ? checked.value : null };
+      });
+
+      const actions = Array.from(document.querySelectorAll('.action-row')).map(row => ({
+        action: row.querySelector('.a-action').value.trim(),
+        by_whom: row.querySelector('.a-who').value.trim(),
+        when: row.querySelector('.a-when').value,
+      })).filter(a => a.action);
+
+      const payload = {
+        check_date: document.getElementById('checkDate').value,
+        check_type: document.getElementById('checkType').value,
+        inspected_by: document.getElementById('inspectedBy').value.trim(),
+        inspected_by_user_id: session.user_id,
+        items,
+        actions,
+        notes: document.getElementById('notes').value.trim() || null,
+      };
+
+      const res = await authFetch('/rest/v1/fire_checks', {
+        method: 'POST',
+        headers: { 'Prefer': 'return=minimal' },
+        body: JSON.stringify(payload),
+      });
+
+      btn.disabled = false; btn.textContent = 'Submit Checklist';
+
+      if (res && res.ok) {
+        showMsg('Checklist submitted — thank you!', true);
+        document.getElementById('checkForm').reset();
+        document.getElementById('checkDate').value = new Date().toISOString().slice(0, 10);
+        document.getElementById('actionsWrap').innerHTML = '';
+        loadRecent();
+      } else {
+        showMsg('Something went wrong submitting the checklist — please try again.', false);
+      }
+    });
+
+    async function loadRecent() {
+      const res = await authFetch('/rest/v1/fire_checks?select=check_date,check_type,inspected_by,items&order=created_at.desc&limit=5');
+      const wrap = document.getElementById('recentWrap');
+      if (!res || !res.ok) { wrap.innerHTML = '<p style="color:var(--muted)">Could not load.</p>'; return; }
+      const rows = await res.json();
+      if (rows.length === 0) { wrap.innerHTML = '<p style="color:var(--muted)">No submissions yet.</p>'; return; }
+      const typeLabels = { change_of_occupancy: 'Change of occupancy', daily: 'Daily', weekly: 'Weekly', monthly: 'Monthly', six_monthly: 'Six-monthly' };
+      wrap.innerHTML = rows.map(r => {
+        const anyNo = (r.items || []).some(i => i.answer === 'no');
+        return `<div class="recent-row"><span>${r.check_date} — ${typeLabels[r.check_type] || r.check_type}</span><span style="color:${anyNo ? '#b4503c' : '#5e7a52'}">${anyNo ? 'Issue flagged' : 'All clear'}</span></div>`;
+      }).join('');
+    }
+
+    document.getElementById('logoutBtn').addEventListener('click', () => {
+      clearSession();
+      window.location.href = 'login.html';
+    });
+
+    loadRecent();
+  </script>
+</body>
+</html>

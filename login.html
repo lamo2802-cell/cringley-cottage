@@ -62,10 +62,16 @@
     const SUPABASE_URL = 'https://yfeyswuxhgezkpcjhznp.supabase.co';
     const SUPABASE_ANON_KEY = 'sb_publishable_96mc6z7EpkjnKPsMX0z5Ug_BJ7MDBNp';
 
-    // Already signed in? Skip straight to admin.
-    if (localStorage.getItem('cc_session')) {
-      window.location.href = 'admin.html';
-    }
+    // Already signed in? Skip straight to the right place.
+    (() => {
+      const existing = localStorage.getItem('cc_session');
+      if (existing) {
+        try {
+          const s = JSON.parse(existing);
+          window.location.href = s.role === 'cleaner' ? 'cleaner-checklist.html' : 'admin.html';
+        } catch (e) {}
+      }
+    })();
 
     document.getElementById('loginForm').addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -90,12 +96,15 @@
           btn.disabled = false; btn.textContent = 'Sign In';
           return;
         }
+        const role = data.user?.app_metadata?.role || null;
         localStorage.setItem('cc_session', JSON.stringify({
           access_token: data.access_token,
           refresh_token: data.refresh_token,
           expires_at: Date.now() + (data.expires_in * 1000),
+          role,
+          user_id: data.user?.id || null,
         }));
-        window.location.href = 'admin.html';
+        window.location.href = role === 'cleaner' ? 'cleaner-checklist.html' : 'admin.html';
       } catch (e) {
         errBox.textContent = 'Something went wrong — please try again.';
         errBox.style.display = 'block';

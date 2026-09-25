@@ -69,6 +69,21 @@
   #msg.ok { background: rgba(94,122,82,0.12); border: 1px solid rgba(94,122,82,0.3); color: #3d5233; }
   #msg.error { background: rgba(180,80,60,0.1); border: 1px solid rgba(180,80,60,0.3); color: #7a3325; }
   #loading { padding: 2rem 0; text-align: center; color: var(--muted); }
+  .fire-card { background: #fff; border-radius: 4px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); margin-bottom: 0.8rem; overflow: hidden; }
+  .fire-card summary {
+    padding: 0.9rem 1.2rem; cursor: pointer; display: flex; justify-content: space-between; align-items: center;
+    font-size: 0.88rem; list-style: none;
+  }
+  .fire-card summary::-webkit-details-marker { display: none; }
+  .fire-status { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; padding: 0.25rem 0.6rem; border-radius: 999px; }
+  .fire-status.clear { background: rgba(94,122,82,0.12); color: #3d5233; }
+  .fire-status.issue { background: rgba(180,80,60,0.12); color: #7a3325; }
+  .fire-detail { padding: 0 1.2rem 1.1rem; font-size: 0.85rem; }
+  .fire-item-row { display: flex; justify-content: space-between; padding: 0.35rem 0; border-top: 1px solid rgba(0,0,0,0.05); }
+  .fire-item-row .ans { text-transform: uppercase; font-size: 0.75rem; font-weight: 600; }
+  .fire-item-row .ans.no { color: #b4503c; }
+  .fire-item-row .ans.yes { color: #5e7a52; }
+  .fire-actions-list { margin-top:0.6rem; padding-top:0.6rem; border-top:1px solid rgba(0,0,0,0.08); }
 </style>
 </head>
 <body>
@@ -106,6 +121,11 @@
         <button id="addBtn">Add</button>
       </div>
     </div>
+
+    <h2 style="margin-top:2.5rem;">Fire Safety Checks</h2>
+    <p class="sub">Submitted by the cleaner at each changeover — records kept as proof of compliance.</p>
+    <div id="fireLoading" style="padding:1rem 0;color:var(--muted);">Loading…</div>
+    <div id="fireList"></div>
   </main>
 
   <script>
@@ -119,6 +139,7 @@
 
     let session = getSession();
     if (!session) window.location.href = 'login.html';
+    else if (session.role !== 'owner') window.location.href = 'cleaner-checklist.html';
 
     async function refreshSession() {
       const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=refresh_token`, {
@@ -128,7 +149,8 @@
       });
       if (!res.ok) { clearSession(); window.location.href = 'login.html'; return null; }
       const data = await res.json();
-      session = { access_token: data.access_token, refresh_token: data.refresh_token, expires_at: Date.now() + data.expires_in * 1000 };
+      const role = data.user?.app_metadata?.role || session.role || null;
+      session = { access_token: data.access_token, refresh_token: data.refresh_token, expires_at: Date.now() + data.expires_in * 1000, role, user_id: data.user?.id || session.user_id || null };
       localStorage.setItem('cc_session', JSON.stringify(session));
       return session;
     }
@@ -234,6 +256,38 @@
       window.location.href = 'login.html';
     });
 
+    const TYPE_LABELS = { change_of_occupancy: 'Change of occupancy', daily: 'Daily', weekly: 'Weekly', monthly: 'Monthly', six_monthly: 'Six-monthly' };
+
+    async function loadFireChecks() {
+      const res = await authFetch('/rest/v1/fire_checks?select=*&order=check_date.desc,created_at.desc&limit=50');
+      document.getElementById('fireLoading').style.display = 'none';
+      if (!res) return;
+      const rows = await res.json();
+      const wrap = document.getElementById('fireList');
+      if (!Array.isArray(rows) || rows.length === 0) {
+        wrap.innerHTML = '<p style="color:var(--muted)">No checks submitted yet.</p>';
+        return;
+      }
+      wrap.innerHTML = rows.map(r => {
+        const items = r.items || [];
+        const anyNo = items.some(i => i.answer === 'no');
+        const actions = r.actions || [];
+        return `
+          <details class="fire-card">
+            <summary>
+              <span>${r.check_date} — ${TYPE_LABELS[r.check_type] || r.check_type} — <strong>${r.inspected_by}</strong></span>
+              <span class="fire-status ${anyNo ? 'issue' : 'clear'}">${anyNo ? 'Issue flagged' : 'All clear'}</span>
+            </summary>
+            <div class="fire-detail">
+              ${items.map(i => `<div class="fire-item-row"><span>${i.n}. ${i.label}</span><span class="ans ${i.answer}">${(i.answer || '—').toUpperCase()}</span></div>`).join('')}
+              ${actions.length > 0 ? `<div class="fire-actions-list"><strong>Actions:</strong><br>` + actions.map(a => `${a.action} — ${a.by_whom || '?'} — ${a.when || '?'}`).join('<br>') + `</div>` : ''}
+              ${r.notes ? `<div class="fire-actions-list"><strong>Notes:</strong> ${r.notes}</div>` : ''}
+            </div>
+          </details>`;
+      }).join('');
+    }
+
+    loadFireChecks();
     loadRates();
   </script>
 </body>
