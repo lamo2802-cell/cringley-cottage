@@ -41,9 +41,17 @@
   #info { background: rgba(94,122,82,0.15); border: 1px solid rgba(94,122,82,0.35); }
   #result { display: none; }
   .card { background: rgba(247,242,234,0.06); border: 1px solid rgba(247,242,234,0.12); border-radius: 4px; padding: 1.3rem 1.4rem; margin-bottom: 1.3rem; }
+  .card .ref { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; color: rgba(247,242,234,0.5); margin-bottom: 0.3rem; }
+  .card .dates { font-family: 'Cormorant Garamond', serif; font-size: 1.3rem; margin-bottom: 0.6rem; }
   .row { display: flex; justify-content: space-between; padding: 0.4rem 0; font-size: 0.88rem; }
   .row.total { border-top: 1px solid rgba(247,242,234,0.1); margin-top: 0.3rem; padding-top: 0.7rem; font-weight: 500; color: var(--sage-light); }
   a.back { display: block; text-align: center; margin-top: 1.5rem; color: rgba(247,242,234,0.4); font-size: 0.78rem; text-decoration: none; }
+  a.btn {
+    background: var(--sage); color: var(--cream); text-decoration: none;
+    padding: 0.85rem; border-radius: 2px; font-size: 0.8rem; letter-spacing: 0.08em;
+    text-transform: uppercase; transition: background 0.2s;
+  }
+  a.btn:hover { background: var(--sage-light); }
 </style>
 </head>
 <body>
@@ -70,6 +78,19 @@
         <div class="row total"><span>Outstanding</span><span id="rOutstanding"></span></div>
       </div>
       <button id="payBtn">Pay Outstanding Balance</button>
+    </div>
+
+    <div id="paidCard" style="display:none">
+      <div class="card">
+        <div class="ref">Booking Reference</div>
+        <div style="margin-bottom:0.9rem"><strong id="pRef" style="color:var(--sage-light);font-size:1.05rem;letter-spacing:0.03em;"></strong></div>
+        <div class="dates" id="pDates"></div>
+        <div class="row"><span>Amount paid</span><span id="pPaid"></span></div>
+      </div>
+      <p style="text-align:center;color:rgba(247,242,234,0.75);font-size:0.9rem;margin-bottom:1rem;">
+        We look forward to welcoming you to Cringley Cottage! Check-in is from <strong>3pm</strong>.
+      </p>
+      <a href="guest-info.html" class="btn" style="display:block;text-align:center;">View Guest Information</a>
     </div>
 
     <a href="index.html" class="back">&#8592; Back to site</a>
@@ -99,6 +120,7 @@
       document.getElementById('err').style.display = 'none';
       document.getElementById('info').style.display = 'none';
       document.getElementById('result').style.display = 'none';
+      document.getElementById('paidCard').style.display = 'none';
       const btn = document.getElementById('lookupBtn');
       btn.disabled = true; btn.textContent = 'Looking up…';
 
@@ -118,7 +140,10 @@
         currentBooking = data;
 
         if (data.outstanding <= 0) {
-          showInfo(`This booking (${data.booking_ref}) is already paid in full — nothing outstanding.`);
+          document.getElementById('pRef').textContent = data.booking_ref;
+          document.getElementById('pDates').textContent = `${fmtDate(data.checkin)} → ${fmtDate(data.checkout)}`;
+          document.getElementById('pPaid').textContent = money(data.amount_paid);
+          document.getElementById('paidCard').style.display = 'block';
           return;
         }
 
