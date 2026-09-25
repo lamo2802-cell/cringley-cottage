@@ -60,11 +60,6 @@
   "telephone": "",
   "email": "hello@cringleycottage.com",
   "priceRange": "££",
-  "starRating": {
-    "@type": "Rating",
-    "ratingValue": "9.4",
-    "bestRating": "10"
-  },
   "amenityFeature": [
     { "@type": "LocationFeatureSpecification", "name": "Free WiFi", "value": true },
     { "@type": "LocationFeatureSpecification", "name": "Log Burning Stove", "value": true },
@@ -935,10 +930,6 @@
     </div>
   </div>
   <div class="hero-stats">
-    <a href="https://www.google.com/maps/place/Cringley+Cottage,+Silver+St,+Leyburn+DL8+3HS" target="_blank" rel="noopener" class="stat-item" style="text-decoration:none;display:block;">
-      <div class="stat-num">9.4</div>
-      <div class="stat-label">Guest Rating ↗</div>
-    </a>
     <div class="stat-item">
       <div class="stat-num">4</div>
       <div class="stat-label">Max Guests</div>
@@ -1280,17 +1271,14 @@
     </div>
     <div class="review-strip" id="reviewStrip">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;">
-        <div>
-          <span style="font-size:1.1rem;color:var(--sage-light);">★★★★★</span>
-          <a href="https://www.booking.com/hotel/gb/cringley-cottage-north-yorkshire2.en-gb.html" target="_blank" rel="noopener" style="font-size:0.72rem;letter-spacing:0.12em;text-transform:uppercase;color:rgba(247,242,234,0.5);margin-left:0.6rem;text-decoration:none;">Booking.com · 9.4/10 ↗</a>
-        </div>
+        <span id="reviewStars" style="font-size:1.1rem;color:var(--sage-light);">★★★★★</span>
         <div style="display:flex;gap:6px;">
           <button onclick="prevReview()" style="background:rgba(247,242,234,0.1);border:1px solid rgba(247,242,234,0.15);color:var(--cream);width:28px;height:28px;border-radius:2px;cursor:pointer;font-size:14px;">‹</button>
           <button onclick="nextReview()" style="background:rgba(247,242,234,0.1);border:1px solid rgba(247,242,234,0.15);color:var(--cream);width:28px;height:28px;border-radius:2px;cursor:pointer;font-size:14px;">›</button>
         </div>
       </div>
-      <p class="review-text" id="reviewText">"Really cosy cottage that was nicely presented. Nice location with a few pubs close by and some wonderful walks."</p>
-      <p class="review-author" id="reviewAuthor">— Verified Guest · Booking.com</p>
+      <p class="review-text" id="reviewText">Loading reviews…</p>
+      <p class="review-author" id="reviewAuthor"></p>
       <div style="display:flex;gap:5px;margin-top:1rem;" id="reviewDots"></div>
       <a href="reviews-policy.html" style="display:inline-block;margin-top:0.9rem;font-size:0.72rem;letter-spacing:0.1em;text-transform:uppercase;color:rgba(247,242,234,0.45);text-decoration:underline;">Review Policy</a>
     </div>
@@ -1988,14 +1976,38 @@
   });
 
   // ─── REVIEWS CAROUSEL ────────────────────────────────────────────
-  const REVIEWS = [
-    { text: '"Location was beautiful, house was really clean. The starter pack was a lovely touch — overall very nice, I would highly recommend."', author: '— Verified Guest · Booking.com' },
-    { text: '"Great location just off the main road, really lovely cottage with a homely feel."', author: '— Verified Guest · Booking.com' },
-    { text: '"Beautiful little cottage in the heart of the village."', author: '— Verified Guest · Booking.com' },
-    { text: '"The cottage was really cosy and well located for great bike rides and walks. It was also really well equipped and we loved the cheese and cake — unaware of this Yorkshire tradition which we have since learned of!"', author: '— Verified Guest · Booking.com' },
-    { text: '"Lots of charm in a beautiful part of the world."', author: '— Verified Guest · Booking.com' },
-  ];
+  const SOURCE_LABELS = { airbnb: 'Airbnb', booking_com: 'Booking.com', direct: 'Direct Guest', google: 'Google' };
+  let REVIEWS = [];
   let currentReview = 0;
+
+  function starsFor(rating, max) {
+    const fullStars = Math.round((rating / max) * 5);
+    return '★'.repeat(Math.max(0, Math.min(5, fullStars))) + '☆'.repeat(5 - Math.max(0, Math.min(5, fullStars)));
+  }
+
+  async function loadReviews() {
+    const textEl = document.getElementById('reviewText');
+    try {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/reviews?select=guest_name,source,rating,rating_max,review_text&order=created_at.desc`, {
+        headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` }
+      });
+      const rows = await res.json();
+      if (Array.isArray(rows) && rows.length > 0) {
+        REVIEWS = rows.map(r => ({
+          text: `"${r.review_text}"`,
+          author: `— ${r.guest_name || 'Verified Guest'} · ${SOURCE_LABELS[r.source] || r.source}`,
+          rating: r.rating, ratingMax: r.rating_max,
+        }));
+        renderReviewDots();
+        goToReview(0, true);
+      } else if (textEl) {
+        textEl.textContent = '';
+        document.getElementById('reviewStrip').style.display = 'none';
+      }
+    } catch (e) {
+      if (textEl) document.getElementById('reviewStrip').style.display = 'none';
+    }
+  }
 
   function renderReviewDots() {
     const dots = document.getElementById('reviewDots');
@@ -2005,25 +2017,29 @@
     ).join('');
   }
 
-  function goToReview(i) {
+  function goToReview(i, immediate) {
     const text   = document.getElementById('reviewText');
     const author = document.getElementById('reviewAuthor');
-    if (!text || !author) return;
-    text.style.opacity = '0';
-    setTimeout(() => {
+    const stars  = document.getElementById('reviewStars');
+    if (!text || !author || !REVIEWS[i]) return;
+    const apply = () => {
       currentReview = i;
       text.textContent   = REVIEWS[i].text;
       author.textContent = REVIEWS[i].author;
+      if (stars) stars.textContent = starsFor(REVIEWS[i].rating, REVIEWS[i].ratingMax);
       text.style.opacity = '1';
       document.querySelectorAll('.review-dot').forEach((d,j) =>
         d.classList.toggle('active', j === i));
-    }, 350);
+    };
+    if (immediate) { apply(); return; }
+    text.style.opacity = '0';
+    setTimeout(apply, 350);
   }
 
-  function nextReview() { goToReview((currentReview + 1) % REVIEWS.length); }
-  function prevReview() { goToReview((currentReview - 1 + REVIEWS.length) % REVIEWS.length); }
+  function nextReview() { if (REVIEWS.length) goToReview((currentReview + 1) % REVIEWS.length); }
+  function prevReview() { if (REVIEWS.length) goToReview((currentReview - 1 + REVIEWS.length) % REVIEWS.length); }
 
-  // Auto-advance every 6 seconds
+  loadReviews();
   setInterval(nextReview, 6000);
 
   // ─── VIDEO: play once then fade to snow image ───────────────────

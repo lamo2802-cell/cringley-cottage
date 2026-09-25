@@ -70,6 +70,14 @@
   #msg.error, .msg-box.error { background: rgba(180,80,60,0.1); border: 1px solid rgba(180,80,60,0.3); color: #7a3325; }
   #loading { padding: 2rem 0; text-align: center; color: var(--muted); }
   .fire-card { background: #fff; border-radius: 4px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); margin-bottom: 0.8rem; overflow: hidden; }
+  .review-card { background: #fff; border-radius: 4px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); margin-bottom: 0.7rem; padding: 0.9rem 1.2rem; display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; }
+  .review-card .rc-body { flex: 1; }
+  .review-card .rc-meta { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); margin-bottom: 0.3rem; }
+  .review-card .rc-text { font-size: 0.88rem; color: var(--ink); line-height: 1.5; }
+  .review-card .rc-actions { display: flex; flex-direction: column; gap: 0.4rem; align-items: flex-end; white-space: nowrap; }
+  .review-card button { background: none; border: none; cursor: pointer; font-size: 0.78rem; font-family: 'DM Sans', sans-serif; }
+  .review-card button.rc-toggle { color: var(--sage); }
+  .review-card button.rc-delete { color: #b4503c; }
   .fire-card summary {
     padding: 0.9rem 1.2rem; cursor: pointer; display: flex; justify-content: space-between; align-items: center;
     font-size: 0.88rem; list-style: none;
@@ -157,6 +165,30 @@
       </div>
     </div>
     <button id="syncNowBtn" style="background:none;border:1px solid var(--sage);color:var(--sage);padding:0.6rem 1.1rem;border-radius:2px;cursor:pointer;font-size:0.82rem;margin-bottom:2.5rem;">Sync Now</button>
+
+    <h2 style="margin-top:2.5rem;">Guest Reviews</h2>
+    <p class="sub">Paste in a good review whenever you spot one on Airbnb, Booking.com, or elsewhere — it'll rotate on the homepage.</p>
+    <div id="reviewsMsg" style="display:none;"></div>
+    <div id="reviewsList" style="margin-bottom:1.2rem;"></div>
+    <div id="addReviewForm" style="background:#fff;border-radius:4px;padding:1.4rem;box-shadow:0 1px 4px rgba(0,0,0,0.08);margin-bottom:2.5rem;">
+      <h3>Add a review</h3>
+      <div class="form-grid" style="grid-template-columns:1fr 1fr 0.7fr 0.7fr;margin-bottom:0.8rem;">
+        <div><label>Guest name (optional)</label><input type="text" id="newRevName" placeholder="e.g. Sarah"></div>
+        <div><label>Source</label>
+          <select id="newRevSource" style="width:100%;border:1px solid rgba(0,0,0,0.15);border-radius:2px;padding:0.55rem 0.6rem;font-family:'DM Sans',sans-serif;font-size:0.85rem;">
+            <option value="airbnb">Airbnb</option>
+            <option value="booking_com" selected>Booking.com</option>
+            <option value="direct">Direct Guest</option>
+            <option value="google">Google</option>
+          </select>
+        </div>
+        <div><label>Rating</label><input type="number" id="newRevRating" value="5" min="0" step="0.1"></div>
+        <div><label>Out of</label><input type="number" id="newRevMax" value="5" min="1" step="0.5"></div>
+      </div>
+      <label>Review text</label>
+      <textarea id="newRevText" rows="3" style="width:100%;border:1px solid rgba(0,0,0,0.15);border-radius:2px;padding:0.6rem 0.7rem;font-family:'DM Sans',sans-serif;font-size:0.88rem;margin-bottom:0.9rem;"></textarea>
+      <button id="addReviewBtn" style="background:var(--sage);color:var(--cream);border:none;padding:0.6rem 1.3rem;border-radius:2px;cursor:pointer;font-size:0.8rem;">Add Review</button>
+    </div>
 
     <h2 style="margin-top:2.5rem;">Accounts</h2>
     <p class="sub">Create logins for staff or other owners — no need to touch Supabase.</p>
@@ -512,6 +544,77 @@
     loadSettings();
     loadIcalSources();
     loadStaff();
+    const REVIEW_SOURCE_LABELS = { airbnb: 'Airbnb', booking_com: 'Booking.com', direct: 'Direct Guest', google: 'Google' };
+
+    function showReviewsMsg(text, ok) {
+      const el = document.getElementById('reviewsMsg');
+      el.textContent = text;
+      el.className = 'msg-box ' + (ok ? 'ok' : 'error');
+      el.style.display = 'block';
+      setTimeout(() => { el.style.display = 'none'; }, 5000);
+    }
+
+    async function loadReviewsAdmin() {
+      const res = await authFetch('/rest/v1/reviews?select=*&order=created_at.desc');
+      const wrap = document.getElementById('reviewsList');
+      if (!res) return;
+      const rows = await res.json();
+      if (!Array.isArray(rows) || rows.length === 0) {
+        wrap.innerHTML = '<p style="color:var(--muted)">No reviews added yet.</p>';
+        return;
+      }
+      wrap.innerHTML = rows.map(r => `
+        <div class="review-card" data-id="${r.id}">
+          <div class="rc-body">
+            <div class="rc-meta">${r.guest_name || 'Verified Guest'} · ${REVIEW_SOURCE_LABELS[r.source] || r.source} · ${r.rating}/${r.rating_max}${r.featured ? '' : ' · Hidden'}</div>
+            <div class="rc-text">${r.review_text}</div>
+          </div>
+          <div class="rc-actions">
+            <button class="rc-toggle">${r.featured ? 'Hide' : 'Show'}</button>
+            <button class="rc-delete">Delete</button>
+          </div>
+        </div>`).join('');
+    }
+
+    document.getElementById('reviewsList').addEventListener('click', async (e) => {
+      const card = e.target.closest('.review-card');
+      if (!card) return;
+      const id = card.dataset.id;
+
+      if (e.target.classList.contains('rc-toggle')) {
+        const currentlyFeatured = e.target.textContent.trim() === 'Hide';
+        const res = await authFetch(`/rest/v1/reviews?id=eq.${id}`, { method: 'PATCH', body: JSON.stringify({ featured: !currentlyFeatured }) });
+        if (res && res.ok) { showReviewsMsg('Updated.', true); loadReviewsAdmin(); } else showReviewsMsg('Update failed.', false);
+      }
+      if (e.target.classList.contains('rc-delete')) {
+        if (!confirm('Delete this review?')) return;
+        const res = await authFetch(`/rest/v1/reviews?id=eq.${id}`, { method: 'DELETE' });
+        if (res && res.ok) { card.remove(); showReviewsMsg('Deleted.', true); } else showReviewsMsg('Delete failed.', false);
+      }
+    });
+
+    document.getElementById('addReviewBtn').addEventListener('click', async () => {
+      const review_text = document.getElementById('newRevText').value.trim();
+      const rating = parseFloat(document.getElementById('newRevRating').value);
+      const rating_max = parseFloat(document.getElementById('newRevMax').value);
+      if (!review_text || isNaN(rating) || isNaN(rating_max)) { showReviewsMsg('Review text and a valid rating are required.', false); return; }
+      const body = {
+        guest_name: document.getElementById('newRevName').value.trim() || null,
+        source: document.getElementById('newRevSource').value,
+        rating, rating_max, review_text,
+      };
+      const res = await authFetch('/rest/v1/reviews', { method: 'POST', headers: { 'Prefer': 'return=representation' }, body: JSON.stringify(body) });
+      if (res && res.ok) {
+        showReviewsMsg('Review added.', true);
+        document.getElementById('newRevName').value = '';
+        document.getElementById('newRevText').value = '';
+        document.getElementById('newRevRating').value = '5';
+        document.getElementById('newRevMax').value = '5';
+        loadReviewsAdmin();
+      } else showReviewsMsg('Could not add review.', false);
+    });
+
+    loadReviewsAdmin();
     loadFireChecks();
     loadRates();
   </script>
