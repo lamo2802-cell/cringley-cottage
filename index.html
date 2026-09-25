@@ -1836,7 +1836,7 @@
       const payRes = await fetch(`${SUPABASE_URL}/functions/v1/create-checkout-session`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ booking_id: bookData.booking_id, return_origin: window.location.origin }),
+        body: JSON.stringify({ booking_id: bookData.booking_id, return_origin: window.location.href.replace(/[^/]*$/, '') }),
       });
       const payData = await payRes.json();
       if (payData.ok && payData.checkout_url) {
