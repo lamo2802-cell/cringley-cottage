@@ -68,7 +68,7 @@
       if (existing) {
         try {
           const s = JSON.parse(existing);
-          window.location.href = s.role === 'cleaner' ? 'cleaner-checklist.html' : 'admin.html';
+          window.location.href = s.role === 'owner' ? 'admin.html' : 'staff-checklist.html';
         } catch (e) {}
       }
     })();
@@ -104,7 +104,7 @@
           role,
           user_id: data.user?.id || null,
         }));
-        window.location.href = role === 'cleaner' ? 'cleaner-checklist.html' : 'admin.html';
+        window.location.href = role === 'owner' ? 'admin.html' : 'staff-checklist.html';
       } catch (e) {
         errBox.textContent = 'Something went wrong — please try again.';
         errBox.style.display = 'block';

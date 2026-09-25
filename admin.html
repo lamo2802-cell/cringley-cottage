@@ -122,8 +122,8 @@
       </div>
     </div>
 
-    <h2 style="margin-top:2.5rem;">Staff Accounts</h2>
-    <p class="sub">Create a login for your cleaner or other staff — no need to touch Supabase.</p>
+    <h2 style="margin-top:2.5rem;">Accounts</h2>
+    <p class="sub">Create logins for staff or other owners — no need to touch Supabase.</p>
     <div id="staffMsg" style="display:none;"></div>
     <table id="staffTable" style="margin-bottom:1.2rem;">
       <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Last signed in</th><th></th></tr></thead>
@@ -137,7 +137,8 @@
         <div><label>Password</label><input type="text" id="staffPassword" placeholder="min. 8 characters"></div>
         <div><label>Role</label>
           <select id="staffRole" style="width:100%;border:1px solid rgba(0,0,0,0.15);border-radius:2px;padding:0.55rem 0.6rem;font-family:'DM Sans',sans-serif;font-size:0.85rem;">
-            <option value="cleaner">Cleaner</option>
+            <option value="staff">Staff</option>
+            <option value="owner">Owner</option>
           </select>
         </div>
         <button id="addStaffBtn">Create</button>
@@ -145,7 +146,7 @@
     </div>
 
     <h2 style="margin-top:2.5rem;">Fire Safety Checks</h2>
-    <p class="sub">Submitted by the cleaner at each changeover — records kept as proof of compliance.</p>
+    <p class="sub">Submitted by staff at each changeover — records kept as proof of compliance.</p>
     <div id="fireLoading" style="padding:1rem 0;color:var(--muted);">Loading…</div>
     <div id="fireList"></div>
   </main>
@@ -161,7 +162,7 @@
 
     let session = getSession();
     if (!session) window.location.href = 'login.html';
-    else if (session.role !== 'owner') window.location.href = 'cleaner-checklist.html';
+    else if (session.role !== 'owner') window.location.href = 'staff-checklist.html';
 
     async function refreshSession() {
       const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=refresh_token`, {
@@ -322,15 +323,16 @@
       const tbody = document.getElementById('staffBody');
       if (!res) return;
       const data = await res.json();
-      if (!data.ok) { tbody.innerHTML = `<tr><td colspan="5" style="color:#b4503c">${data.error || 'Could not load staff accounts.'}</td></tr>`; return; }
-      if (data.staff.length === 0) { tbody.innerHTML = '<tr><td colspan="5" style="color:var(--muted)">No staff accounts yet.</td></tr>'; return; }
-      tbody.innerHTML = data.staff.map(s => `
+      if (!data.ok) { tbody.innerHTML = `<tr><td colspan="5" style="color:#b4503c">${data.error || 'Could not load accounts.'}</td></tr>`; return; }
+      if (data.accounts.length === 0) { tbody.innerHTML = '<tr><td colspan="5" style="color:var(--muted)">No accounts yet.</td></tr>'; return; }
+      const roleLabel = r => r === 'owner' ? 'Owner' : 'Staff';
+      tbody.innerHTML = data.accounts.map(s => `
         <tr data-id="${s.id}">
           <td data-label="Name">${s.display_name || '—'}</td>
           <td data-label="Email">${s.email}</td>
-          <td data-label="Role">${s.role}</td>
+          <td data-label="Role">${roleLabel(s.role)}</td>
           <td data-label="Last signed in">${s.last_sign_in_at ? new Date(s.last_sign_in_at).toLocaleDateString('en-GB') : 'Never'}</td>
-          <td class="row-actions"><button class="danger deleteStaffBtn">Delete</button></td>
+          <td class="row-actions">${s.is_self ? '<span style="color:var(--muted);font-size:0.78rem;">This is you</span>' : '<button class="danger deleteStaffBtn">Delete</button>'}</td>
         </tr>`).join('');
     }
 
@@ -338,7 +340,7 @@
       if (!e.target.classList.contains('deleteStaffBtn')) return;
       const tr = e.target.closest('tr');
       const id = tr.dataset.id;
-      if (!confirm('Delete this staff account? They will no longer be able to sign in.')) return;
+      if (!confirm('Delete this account? They will no longer be able to sign in.')) return;
       const res = await authFetch('/functions/v1/delete-staff-account', { method: 'POST', body: JSON.stringify({ user_id: id }) });
       const data = res ? await res.json() : { ok: false };
       if (data.ok) { tr.remove(); showStaffMsg('Account deleted.', true); } else showStaffMsg(data.error || 'Delete failed.', false);
