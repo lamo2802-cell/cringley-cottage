@@ -111,8 +111,20 @@
         <label>Minimum notice (nights before check-in)</label>
         <input type="number" id="minAdvanceInput" min="0" style="width:120px;border:1px solid rgba(0,0,0,0.15);border-radius:2px;padding:0.55rem 0.6rem;font-family:'DM Sans',sans-serif;font-size:0.85rem;">
       </div>
+      <div>
+        <label>Deposit (%)</label>
+        <input type="number" id="depositPercentInput" min="0" max="100" step="0.5" style="width:120px;border:1px solid rgba(0,0,0,0.15);border-radius:2px;padding:0.55rem 0.6rem;font-family:'DM Sans',sans-serif;font-size:0.85rem;">
+      </div>
+      <div>
+        <label>Full payment required if check-in is within (days)</label>
+        <input type="number" id="fullPaymentDaysInput" min="0" style="width:140px;border:1px solid rgba(0,0,0,0.15);border-radius:2px;padding:0.55rem 0.6rem;font-family:'DM Sans',sans-serif;font-size:0.85rem;">
+      </div>
+      <div>
+        <label>7+ night discount (%)</label>
+        <input type="number" id="weekDiscountInput" min="0" max="100" step="0.5" style="width:120px;border:1px solid rgba(0,0,0,0.15);border-radius:2px;padding:0.55rem 0.6rem;font-family:'DM Sans',sans-serif;font-size:0.85rem;">
+      </div>
       <button id="saveSettingsBtn" style="background:var(--sage);color:var(--cream);border:none;padding:0.6rem 1.1rem;border-radius:2px;cursor:pointer;font-size:0.8rem;">Save</button>
-      <p style="font-size:0.78rem;color:var(--muted);width:100%;margin-top:0.3rem;">0 allows same-day bookings, 1 means the earliest bookable date is tomorrow, and so on.</p>
+      <p style="font-size:0.78rem;color:var(--muted);width:100%;margin-top:0.3rem;">These drive the live pricing shown on the site and the actual amount charged — there's no separate copy to edit elsewhere.</p>
     </div>
 
     <h2>Seasonal Rates</h2>
@@ -523,20 +535,32 @@
     }
 
     async function loadSettings() {
-      const res = await authFetch('/rest/v1/site_settings?select=min_advance_nights&id=eq.1');
+      const res = await authFetch('/rest/v1/site_settings?select=min_advance_nights,deposit_percent,full_payment_window_days,week_discount_percent&id=eq.1');
       if (!res) return;
       const rows = await res.json();
       if (Array.isArray(rows) && rows[0]) {
         document.getElementById('minAdvanceInput').value = rows[0].min_advance_nights;
+        document.getElementById('depositPercentInput').value = rows[0].deposit_percent;
+        document.getElementById('fullPaymentDaysInput').value = rows[0].full_payment_window_days;
+        document.getElementById('weekDiscountInput').value = rows[0].week_discount_percent;
       }
     }
 
     document.getElementById('saveSettingsBtn').addEventListener('click', async () => {
-      const val = parseInt(document.getElementById('minAdvanceInput').value, 10);
-      if (isNaN(val) || val < 0) { showSettingsMsg('Enter a number of 0 or more.', false); return; }
+      const minAdvance = parseInt(document.getElementById('minAdvanceInput').value, 10);
+      const depositPercent = parseFloat(document.getElementById('depositPercentInput').value);
+      const fullPaymentDays = parseInt(document.getElementById('fullPaymentDaysInput').value, 10);
+      const weekDiscount = parseFloat(document.getElementById('weekDiscountInput').value);
+      if ([minAdvance, fullPaymentDays].some(v => isNaN(v) || v < 0)) { showSettingsMsg('Notice and full-payment-window must be 0 or more.', false); return; }
+      if ([depositPercent, weekDiscount].some(v => isNaN(v) || v < 0 || v > 100)) { showSettingsMsg('Percentages must be between 0 and 100.', false); return; }
       const res = await authFetch('/rest/v1/site_settings?id=eq.1', {
         method: 'PATCH',
-        body: JSON.stringify({ min_advance_nights: val }),
+        body: JSON.stringify({
+          min_advance_nights: minAdvance,
+          deposit_percent: depositPercent,
+          full_payment_window_days: fullPaymentDays,
+          week_discount_percent: weekDiscount,
+        }),
       });
       if (res && res.ok) showSettingsMsg('Saved.', true); else showSettingsMsg('Save failed.', false);
     });

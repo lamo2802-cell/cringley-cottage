@@ -1167,7 +1167,7 @@
           <div class="bp-line"><span>Select your dates above</span></div>
         </div>
         <button class="bp-submit" id="bpSubmit" disabled style="opacity:0.45;cursor:not-allowed">Book Now</button>
-        <p class="bp-small">7+ nights get 10% off &middot; 25% deposit to secure</p>
+        <p class="bp-small" id="bpSmallNote">7+ nights get 10% off &middot; 25% deposit to secure</p>
       </div>
 
       <!-- STEP 2: Guest details -->
@@ -1252,7 +1252,7 @@
   <div>
     <p class="section-label">Book Direct</p>
     <h2 class="section-title">Questions?<br>Get in Touch</h2>
-    <p class="section-body" style="margin-bottom:2rem">Fill in your details and we'll confirm availability and send a deposit link within 24 hours.</p>
+    <p class="section-body" style="margin-bottom:2rem" id="contactIntro">Get in touch with any questions about your stay — to book specific dates, use the availability checker above.</p>
     <div class="info-block">
       <strong>Location</strong>
       <span>Silver Street, Askrigg, Leyburn, DL8 3HS</span>
@@ -1267,7 +1267,7 @@
     </div>
     <div class="info-block">
       <strong>Deposit</strong>
-      <span>25% secures your dates · Balance 6 weeks before arrival</span>
+      <span id="depositInfoBlock">25% secures your dates · balance due 14 days before arrival</span>
     </div>
     <div class="review-strip" id="reviewStrip">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;">
@@ -1394,8 +1394,8 @@
   ];
 
   let RATES = [...RATES_FALLBACK];
-  const WEEK_DISCOUNT = 0.10;
-  const DEPOSIT_RATE  = 0.25;
+  let WEEK_DISCOUNT = 0.10;
+  let DEPOSIT_RATE  = 0.25;
 
   async function loadRatesFromSheet() {
     try {
@@ -1495,18 +1495,48 @@
   let selStart  = null;
   let selEnd    = null;
 
-  // Minimum nights ahead a booking can start — owner-configurable in admin.html
+  // Owner-configurable in admin.html — Booking Settings
   let MIN_ADVANCE_NIGHTS = 2;
+  let FULL_PAYMENT_WINDOW_DAYS = 14;
   async function loadBookingSettings() {
     try {
-      const res = await fetch(`${SUPABASE_URL}/rest/v1/site_settings?select=min_advance_nights&id=eq.1`, {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/site_settings?select=min_advance_nights,deposit_percent,full_payment_window_days,week_discount_percent&id=eq.1`, {
         headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` }
       });
       const rows = await res.json();
-      if (Array.isArray(rows) && rows[0] && typeof rows[0].min_advance_nights === 'number') {
-        MIN_ADVANCE_NIGHTS = rows[0].min_advance_nights;
+      const s = Array.isArray(rows) && rows[0];
+      if (s) {
+        if (typeof s.min_advance_nights === 'number') MIN_ADVANCE_NIGHTS = s.min_advance_nights;
+        if (typeof s.deposit_percent === 'number') DEPOSIT_RATE = s.deposit_percent / 100;
+        if (typeof s.full_payment_window_days === 'number') FULL_PAYMENT_WINDOW_DAYS = s.full_payment_window_days;
+        if (typeof s.week_discount_percent === 'number') WEEK_DISCOUNT = s.week_discount_percent / 100;
       }
-    } catch (e) { /* keep default */ }
+    } catch (e) { /* keep defaults */ }
+    applyPricingCopy();
+  }
+
+  // Updates every piece of static marketing text that quotes the deposit %,
+  // discount %, or full-payment window — single source of truth, no more
+  // risk of the page contradicting what's actually charged.
+  function applyPricingCopy() {
+    const depositPct = Math.round(DEPOSIT_RATE * 100);
+    const discountPct = Math.round(WEEK_DISCOUNT * 100);
+    const days = FULL_PAYMENT_WINDOW_DAYS;
+    const dayWord = days === 1 ? 'day' : 'days';
+
+    const bpSmall = document.getElementById('bpSmallNote');
+    if (bpSmall) bpSmall.textContent = `7+ nights get ${discountPct}% off · ${depositPct}% deposit to secure`;
+
+    const bpPaymentNote = document.getElementById('bpPaymentNote');
+    if (bpPaymentNote && !bpPaymentNote.dataset.dynamicOverride) {
+      bpPaymentNote.textContent = `${depositPct}% deposit to secure · balance due before arrival`;
+    }
+
+    const depositInfoBlock = document.getElementById('depositInfoBlock');
+    if (depositInfoBlock) depositInfoBlock.textContent = `${depositPct}% secures your dates · balance due ${days} ${dayWord} before arrival`;
+
+    const contactIntro = document.getElementById('contactIntro');
+    if (contactIntro) contactIntro.textContent = 'Get in touch with any questions about your stay — to book specific dates, use the availability checker above.';
   }
   function tooSoon(date) {
     const cutoff = new Date(today); cutoff.setDate(cutoff.getDate() + MIN_ADVANCE_NIGHTS);
@@ -1687,7 +1717,7 @@
     let lines = '';
     for (const [rate, count] of Object.entries(breakdown))
       lines += `<div class="bp-line"><span>${count} night${count>1?'s':''} × £${rate}/night</span><span>£${count*rate}</span></div>`;
-    if (isWeek) lines += `<div class="bp-line" style="color:var(--sage-light)"><span>7-night discount (10%)</span><span>−£${discount}</span></div>`;
+    if (isWeek) lines += `<div class="bp-line" style="color:var(--sage-light)"><span>7-night discount (${Math.round(WEEK_DISCOUNT*100)}%)</span><span>−£${discount}</span></div>`;
     summary.innerHTML = lines +
       `<div class="bp-line total"><span>Total</span><span>£${finalTotal}</span></div>` +
       `<div class="bp-line"><span>${Math.round(DEPOSIT_RATE*100)}% deposit to secure</span><span>£${deposit}</span></div>`;
@@ -1782,14 +1812,17 @@
     const finalTotal = total - (isWeek ? Math.round(total * WEEK_DISCOUNT) : 0);
     const today = new Date(); today.setHours(0,0,0,0);
     const daysUntil = Math.round((new Date(ci) - today) / 86400000);
-    const isFullPayment = daysUntil < 14;
+    const isFullPayment = daysUntil < FULL_PAYMENT_WINDOW_DAYS;
     const amountDue = isFullPayment ? finalTotal : Math.round(finalTotal * DEPOSIT_RATE);
+    const depositPct = Math.round(DEPOSIT_RATE * 100);
     document.getElementById('bpDateSummaryBox').innerHTML =
       `${ci} → ${co} · ${nights} night${nights!==1?'s':''} · ${guests} guest${guests!==1?'s':''}<br>` +
-      `Total £${finalTotal} · ${isFullPayment ? 'Full payment due (within 14 days)' : '25% deposit'}: <strong>£${amountDue}</strong>`;
-    document.getElementById('bpPaymentNote').textContent = isFullPayment
-      ? 'Check-in is within 14 days — full payment is required to book'
-      : '25% deposit to secure · balance due before arrival';
+      `Total £${finalTotal} · ${isFullPayment ? `Full payment due (within ${FULL_PAYMENT_WINDOW_DAYS} days)` : `${depositPct}% deposit`}: <strong>£${amountDue}</strong>`;
+    const bpPaymentNoteEl = document.getElementById('bpPaymentNote');
+    bpPaymentNoteEl.dataset.dynamicOverride = '1';
+    bpPaymentNoteEl.textContent = isFullPayment
+      ? `Check-in is within ${FULL_PAYMENT_WINDOW_DAYS} days — full payment is required to book`
+      : `${depositPct}% deposit to secure · balance due before arrival`;
 
     renderExtraGuestRows(guests);
 
