@@ -122,6 +122,30 @@
       </div>
     </div>
 
+    <h2 style="margin-top:2.5rem;">Share Your Calendar</h2>
+    <p class="sub">Give this link to Airbnb, Booking.com, or any other platform's "import a calendar" setting — it publishes your direct bookings so they block those dates too.</p>
+    <div style="display:flex;gap:0.6rem;flex-wrap:wrap;align-items:center;background:#fff;border-radius:4px;padding:1rem 1.2rem;box-shadow:0 1px 4px rgba(0,0,0,0.08);margin-bottom:2rem;">
+      <input type="text" id="exportUrlField" readonly style="flex:1;min-width:220px;border:1px solid rgba(0,0,0,0.12);border-radius:2px;padding:0.55rem 0.7rem;font-size:0.82rem;background:rgba(94,122,82,0.05);">
+      <button id="copyExportBtn" style="background:var(--sage);color:var(--cream);border:none;padding:0.6rem 1.1rem;border-radius:2px;cursor:pointer;font-size:0.8rem;white-space:nowrap;">Copy Link</button>
+    </div>
+
+    <h2>Sync Calendars In</h2>
+    <p class="sub">Add each platform's own export/iCal link here — we'll check them regularly and block those dates on your site automatically.</p>
+    <div id="icalMsg" style="display:none;"></div>
+    <table id="icalTable" style="margin-bottom:1rem;">
+      <thead><tr><th>Label</th><th>Feed URL</th><th></th></tr></thead>
+      <tbody id="icalBody"><tr><td colspan="3" style="color:var(--muted)">Loading…</td></tr></tbody>
+    </table>
+    <div id="addIcalForm" style="margin-bottom:1rem;">
+      <h3>Add a calendar to sync in</h3>
+      <div class="form-grid" style="grid-template-columns:1fr 2.2fr auto;">
+        <div><label>Label</label><input type="text" id="newIcalLabel" placeholder="e.g. VRBO"></div>
+        <div><label>Feed URL</label><input type="text" id="newIcalUrl" placeholder="https://..."></div>
+        <button id="addIcalBtn">Add</button>
+      </div>
+    </div>
+    <button id="syncNowBtn" style="background:none;border:1px solid var(--sage);color:var(--sage);padding:0.6rem 1.1rem;border-radius:2px;cursor:pointer;font-size:0.82rem;margin-bottom:2.5rem;">Sync Now</button>
+
     <h2 style="margin-top:2.5rem;">Accounts</h2>
     <p class="sub">Create logins for staff or other owners — no need to touch Supabase.</p>
     <div id="staffMsg" style="display:none;"></div>
@@ -363,6 +387,90 @@
       }
     });
 
+    // ─── Export link (direct bookings → Airbnb/Booking.com) ─────────
+    document.getElementById('exportUrlField').value = `${SUPABASE_URL}/functions/v1/export-calendar`;
+    document.getElementById('copyExportBtn').addEventListener('click', () => {
+      const field = document.getElementById('exportUrlField');
+      field.select();
+      navigator.clipboard?.writeText(field.value).then(() => {
+        const btn = document.getElementById('copyExportBtn');
+        const orig = btn.textContent;
+        btn.textContent = 'Copied ✓';
+        setTimeout(() => { btn.textContent = orig; }, 1800);
+      }).catch(() => {});
+    });
+
+    // ─── Calendars synced in ─────────────────────────────────────────
+    function showIcalMsg(text, ok) {
+      const el = document.getElementById('icalMsg');
+      el.textContent = text;
+      el.className = 'msg-box ' + (ok ? 'ok' : 'error');
+      el.style.display = 'block';
+      setTimeout(() => { el.style.display = 'none'; }, 6000);
+    }
+
+    function maskUrl(url) {
+      return url.length > 46 ? url.slice(0, 46) + '…' : url;
+    }
+
+    async function loadIcalSources() {
+      const res = await authFetch('/rest/v1/ical_sources?select=*&order=created_at.asc');
+      const tbody = document.getElementById('icalBody');
+      if (!res) return;
+      const rows = await res.json();
+      if (!Array.isArray(rows) || rows.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="3" style="color:var(--muted)">No calendars added yet.</td></tr>';
+        return;
+      }
+      tbody.innerHTML = rows.map(r => `
+        <tr data-id="${r.id}">
+          <td data-label="Label">${r.label}</td>
+          <td data-label="Feed URL" style="font-size:0.78rem;color:var(--muted);word-break:break-all;">${maskUrl(r.url)}</td>
+          <td class="row-actions"><button class="danger deleteIcalBtn">Delete</button></td>
+        </tr>`).join('');
+    }
+
+    document.getElementById('icalBody').addEventListener('click', async (e) => {
+      if (!e.target.classList.contains('deleteIcalBtn')) return;
+      const tr = e.target.closest('tr');
+      if (!confirm('Stop syncing this calendar? Dates already imported from it will stay unless you remove them separately.')) return;
+      const res = await authFetch(`/rest/v1/ical_sources?id=eq.${tr.dataset.id}`, { method: 'DELETE' });
+      if (res && res.ok) { tr.remove(); showIcalMsg('Calendar removed.', true); } else showIcalMsg('Could not remove — please try again.', false);
+    });
+
+    document.getElementById('addIcalBtn').addEventListener('click', async () => {
+      const label = document.getElementById('newIcalLabel').value.trim();
+      const url = document.getElementById('newIcalUrl').value.trim();
+      if (!label || !url) { showIcalMsg('Label and feed URL are both required.', false); return; }
+      const sourceTag = 'ext_' + Array.from(crypto.getRandomValues(new Uint8Array(5))).map(b => b.toString(16).padStart(2,'0')).join('');
+      const res = await authFetch('/rest/v1/ical_sources', {
+        method: 'POST',
+        headers: { 'Prefer': 'return=representation' },
+        body: JSON.stringify({ label, url, source_tag: sourceTag }),
+      });
+      if (res && res.ok) {
+        showIcalMsg('Calendar added — it will sync automatically within a couple of hours, or click "Sync Now".', true);
+        document.getElementById('newIcalLabel').value = '';
+        document.getElementById('newIcalUrl').value = '';
+        loadIcalSources();
+      } else showIcalMsg('Could not add that calendar — please check the URL and try again.', false);
+    });
+
+    document.getElementById('syncNowBtn').addEventListener('click', async () => {
+      const btn = document.getElementById('syncNowBtn');
+      btn.disabled = true; btn.textContent = 'Syncing…';
+      const res = await authFetch('/functions/v1/sync-calendars', { method: 'POST' });
+      const data = res ? await res.json() : { ok: false };
+      btn.disabled = false; btn.textContent = 'Sync Now';
+      if (data.ok) {
+        const summary = Object.entries(data.results || {}).map(([label, count]) => `${label}: ${count}`).join(', ');
+        showIcalMsg(`Sync complete — ${summary || 'no calendars configured'}.`, true);
+      } else {
+        showIcalMsg(data.error || 'Sync failed — please try again.', false);
+      }
+    });
+
+    loadIcalSources();
     loadStaff();
     loadFireChecks();
     loadRates();
