@@ -133,6 +133,7 @@
     backdrop-filter: blur(6px);
   }
   .nav-links { display: flex; gap: 2.2rem; list-style: none; }
+  .nav-manage-mobile { display: none; }
   .nav-links a {
     color: rgba(247,242,234,0.75);
     text-decoration: none;
@@ -879,6 +880,11 @@
     .g-cell { grid-column: auto !important; grid-row: auto !important; aspect-ratio: 4/3; }
     nav { padding: 1rem 5%; }
     .nav-links { display: none; }
+    .nav-manage-mobile {
+      display: inline-block; color: var(--cream); text-decoration: none;
+      font-size: 0.72rem; letter-spacing: 0.05em; text-transform: uppercase;
+      border: 1px solid rgba(247,242,234,0.3); padding: 0.5rem 0.8rem; border-radius: 2px;
+    }
     .bp-row { grid-template-columns: 1fr; }
   }
   .float-book {
@@ -910,8 +916,10 @@
     <li><a href="#gallery">Gallery</a></li>
     <li><a href="#walks">Explore</a></li>
     <li><a href="#availability">Availability</a></li>
+    <li><a href="pay-balance.html">Manage Booking</a></li>
     <li><a href="#availability" class="nav-cta">Book Now</a></li>
   </ul>
+  <a href="pay-balance.html" class="nav-manage-mobile">Manage Booking</a>
 </nav>
 
 <!-- HERO -->
