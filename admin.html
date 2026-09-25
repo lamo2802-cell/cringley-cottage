@@ -65,9 +65,9 @@
     td { border: none; padding: 0.35rem 0; }
     td::before { content: attr(data-label); display: block; font-size: 0.65rem; text-transform: uppercase; color: var(--muted); margin-bottom: 0.15rem; }
   }
-  #msg { display: none; padding: 0.7rem 1rem; border-radius: 2px; font-size: 0.85rem; margin-bottom: 1rem; }
-  #msg.ok { background: rgba(94,122,82,0.12); border: 1px solid rgba(94,122,82,0.3); color: #3d5233; }
-  #msg.error { background: rgba(180,80,60,0.1); border: 1px solid rgba(180,80,60,0.3); color: #7a3325; }
+  #msg, .msg-box { display: none; padding: 0.7rem 1rem; border-radius: 2px; font-size: 0.85rem; margin-bottom: 1rem; }
+  #msg.ok, .msg-box.ok { background: rgba(94,122,82,0.12); border: 1px solid rgba(94,122,82,0.3); color: #3d5233; }
+  #msg.error, .msg-box.error { background: rgba(180,80,60,0.1); border: 1px solid rgba(180,80,60,0.3); color: #7a3325; }
   #loading { padding: 2rem 0; text-align: center; color: var(--muted); }
   .fire-card { background: #fff; border-radius: 4px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); margin-bottom: 0.8rem; overflow: hidden; }
   .fire-card summary {
@@ -119,6 +119,28 @@
         <div><label>£/night</label><input type="number" id="newRate" min="1"></div>
         <div><label>Min nights</label><input type="number" id="newMinNights" value="2" min="1"></div>
         <button id="addBtn">Add</button>
+      </div>
+    </div>
+
+    <h2 style="margin-top:2.5rem;">Staff Accounts</h2>
+    <p class="sub">Create a login for your cleaner or other staff — no need to touch Supabase.</p>
+    <div id="staffMsg" style="display:none;"></div>
+    <table id="staffTable" style="margin-bottom:1.2rem;">
+      <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Last signed in</th><th></th></tr></thead>
+      <tbody id="staffBody"><tr><td colspan="5" style="color:var(--muted)">Loading…</td></tr></tbody>
+    </table>
+    <div id="addStaffForm">
+      <h3>Add a staff account</h3>
+      <div class="form-grid" style="grid-template-columns:1fr 1.4fr 1fr 1fr auto;">
+        <div><label>Name</label><input type="text" id="staffName" placeholder="e.g. Jane"></div>
+        <div><label>Email</label><input type="email" id="staffEmail" placeholder="jane@example.com"></div>
+        <div><label>Password</label><input type="text" id="staffPassword" placeholder="min. 8 characters"></div>
+        <div><label>Role</label>
+          <select id="staffRole" style="width:100%;border:1px solid rgba(0,0,0,0.15);border-radius:2px;padding:0.55rem 0.6rem;font-family:'DM Sans',sans-serif;font-size:0.85rem;">
+            <option value="cleaner">Cleaner</option>
+          </select>
+        </div>
+        <button id="addStaffBtn">Create</button>
       </div>
     </div>
 
@@ -287,6 +309,59 @@
       }).join('');
     }
 
+    function showStaffMsg(text, ok) {
+      const el = document.getElementById('staffMsg');
+      el.textContent = text;
+      el.className = 'msg-box ' + (ok ? 'ok' : 'error');
+      el.style.display = 'block';
+      setTimeout(() => { el.style.display = 'none'; }, 6000);
+    }
+
+    async function loadStaff() {
+      const res = await authFetch('/functions/v1/list-staff-accounts', { method: 'POST' });
+      const tbody = document.getElementById('staffBody');
+      if (!res) return;
+      const data = await res.json();
+      if (!data.ok) { tbody.innerHTML = `<tr><td colspan="5" style="color:#b4503c">${data.error || 'Could not load staff accounts.'}</td></tr>`; return; }
+      if (data.staff.length === 0) { tbody.innerHTML = '<tr><td colspan="5" style="color:var(--muted)">No staff accounts yet.</td></tr>'; return; }
+      tbody.innerHTML = data.staff.map(s => `
+        <tr data-id="${s.id}">
+          <td data-label="Name">${s.display_name || '—'}</td>
+          <td data-label="Email">${s.email}</td>
+          <td data-label="Role">${s.role}</td>
+          <td data-label="Last signed in">${s.last_sign_in_at ? new Date(s.last_sign_in_at).toLocaleDateString('en-GB') : 'Never'}</td>
+          <td class="row-actions"><button class="danger deleteStaffBtn">Delete</button></td>
+        </tr>`).join('');
+    }
+
+    document.getElementById('staffBody').addEventListener('click', async (e) => {
+      if (!e.target.classList.contains('deleteStaffBtn')) return;
+      const tr = e.target.closest('tr');
+      const id = tr.dataset.id;
+      if (!confirm('Delete this staff account? They will no longer be able to sign in.')) return;
+      const res = await authFetch('/functions/v1/delete-staff-account', { method: 'POST', body: JSON.stringify({ user_id: id }) });
+      const data = res ? await res.json() : { ok: false };
+      if (data.ok) { tr.remove(); showStaffMsg('Account deleted.', true); } else showStaffMsg(data.error || 'Delete failed.', false);
+    });
+
+    document.getElementById('addStaffBtn').addEventListener('click', async () => {
+      const email = document.getElementById('staffEmail').value.trim();
+      const password = document.getElementById('staffPassword').value;
+      const role = document.getElementById('staffRole').value;
+      const display_name = document.getElementById('staffName').value.trim();
+      if (!email || !password) { showStaffMsg('Email and password are required.', false); return; }
+      const res = await authFetch('/functions/v1/create-staff-account', { method: 'POST', body: JSON.stringify({ email, password, role, display_name }) });
+      const data = res ? await res.json() : { ok: false };
+      if (data.ok) {
+        showStaffMsg(`Account created for ${email}. Give them this email and password to sign in at login.html.`, true);
+        ['staffName','staffEmail','staffPassword'].forEach(id => document.getElementById(id).value = '');
+        loadStaff();
+      } else {
+        showStaffMsg(data.error || 'Could not create account.', false);
+      }
+    });
+
+    loadStaff();
     loadFireChecks();
     loadRates();
   </script>
