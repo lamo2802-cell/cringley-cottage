@@ -15,40 +15,116 @@
   body {
     font-family: 'DM Sans', sans-serif; background: var(--ink); color: var(--cream);
     min-height: 100vh; display: flex; align-items: center; justify-content: center;
-    padding: 2rem 6%; line-height: 1.75; text-align: center;
+    padding: 2.5rem 6%; line-height: 1.7;
   }
-  .check { font-size: 3rem; color: var(--sage-light); margin-bottom: 1rem; }
-  h1 { font-family: 'Cormorant Garamond', serif; font-weight: 600; font-size: 2.2rem; margin-bottom: 0.8rem; }
-  p { color: rgba(247,242,234,0.7); max-width: 480px; margin: 0 auto 0.8rem; }
+  .box { width: 100%; max-width: 460px; text-align: center; }
+  .check { font-size: 2.8rem; color: var(--sage-light); margin-bottom: 1rem; }
+  h1 { font-family: 'Cormorant Garamond', serif; font-weight: 600; font-size: 2rem; margin-bottom: 0.5rem; }
+  p.lead { color: rgba(247,242,234,0.65); margin-bottom: 1.8rem; }
+  #loading { color: rgba(247,242,234,0.5); font-size: 0.85rem; }
+  .card {
+    display: none; text-align: left; background: rgba(247,242,234,0.06);
+    border: 1px solid rgba(247,242,234,0.12); border-radius: 4px; padding: 1.4rem 1.5rem;
+    margin-bottom: 1.5rem;
+  }
+  .card .ref { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; color: rgba(247,242,234,0.5); margin-bottom: 0.3rem; }
+  .card .dates { font-family: 'Cormorant Garamond', serif; font-size: 1.3rem; margin-bottom: 1rem; }
+  .row { display: flex; justify-content: space-between; padding: 0.5rem 0; font-size: 0.88rem; border-top: 1px solid rgba(247,242,234,0.08); }
+  .row.total { font-weight: 500; color: var(--sage-light); }
+  .balance-note {
+    display: none; background: rgba(200,150,60,0.12); border: 1px solid rgba(200,150,60,0.3);
+    border-radius: 2px; padding: 0.9rem 1.1rem; font-size: 0.85rem; margin-bottom: 1.5rem; text-align: left;
+  }
   a.btn {
-    display: inline-block; margin-top: 1.5rem; background: var(--sage); color: var(--cream);
-    text-decoration: none; padding: 0.85rem 1.8rem; border-radius: 2px;
-    font-size: 0.8rem; letter-spacing: 0.08em; text-transform: uppercase;
+    display: inline-block; margin: 0 0.3rem; background: var(--sage); color: var(--cream);
+    text-decoration: none; padding: 0.8rem 1.5rem; border-radius: 2px;
+    font-size: 0.78rem; letter-spacing: 0.08em; text-transform: uppercase;
     transition: background 0.2s;
   }
   a.btn:hover { background: var(--sage-light); }
-  #status { font-size: 0.82rem; color: rgba(247,242,234,0.45); margin-top: 2rem; }
+  a.btn.outline { background: none; border: 1px solid rgba(247,242,234,0.25); }
 </style>
 </head>
 <body>
-  <div>
+  <div class="box">
     <div class="check">&#10003;</div>
     <h1>Payment received</h1>
-    <p>Thank you — your booking at Cringley Cottage is confirmed. A confirmation email will follow shortly.</p>
-    <p id="status">Finalizing your confirmation…</p>
-    <a href="index.html" class="btn">Back to site</a>
+    <p class="lead">Thank you — your booking at Cringley Cottage is confirmed.</p>
+
+    <p id="loading">Loading your booking details…</p>
+
+    <div class="card" id="card">
+      <div class="ref">Booking Reference</div>
+      <div style="margin-bottom:0.9rem"><strong id="refVal" style="color:var(--sage-light);font-size:1.05rem;letter-spacing:0.03em;"></strong></div>
+      <div class="dates" id="datesVal"></div>
+      <div class="row"><span>Total cost</span><span id="totalVal"></span></div>
+      <div class="row"><span>Paid so far</span><span id="paidVal"></span></div>
+      <div class="row total"><span id="outstandingLabel">Outstanding</span><span id="outstandingVal"></span></div>
+    </div>
+
+    <div class="balance-note" id="balanceNote"></div>
+
+    <div>
+      <a href="index.html" class="btn outline">Back to site</a>
+      <a href="pay-balance.html" class="btn" id="payBalanceLink" style="display:none">Pay Balance Later</a>
+    </div>
   </div>
+
   <script>
-    // Purely cosmetic status check — the booking was already confirmed
-    // server-side by Stripe's webhook, not by this page loading.
+    const SUPABASE_URL = 'https://yfeyswuxhgezkpcjhznp.supabase.co';
     const params = new URLSearchParams(window.location.search);
     const sessionId = params.get('session_id');
-    const statusEl = document.getElementById('status');
-    if (sessionId) {
-      statusEl.textContent = 'Booking reference: ' + sessionId.slice(-12);
-    } else {
-      statusEl.style.display = 'none';
+
+    function money(n) { return '£' + Number(n).toFixed(2).replace(/\.00$/, ''); }
+    function fmtDate(d) {
+      return new Date(d + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
     }
+
+    async function fetchBooking(attemptsLeft) {
+      if (!sessionId) { document.getElementById('loading').textContent = ''; return; }
+      try {
+        const res = await fetch(`${SUPABASE_URL}/functions/v1/get-booking-by-session`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ session_id: sessionId }),
+        });
+        const data = await res.json();
+        if (data.ok && data.status === 'confirmed') {
+          render(data);
+          return;
+        }
+      } catch (e) {}
+      if (attemptsLeft > 0) {
+        setTimeout(() => fetchBooking(attemptsLeft - 1), 1500);
+      } else {
+        document.getElementById('loading').textContent = 'Your payment went through — your confirmation is on its way. If this keeps loading, contact us with your payment reference.';
+      }
+    }
+
+    function render(data) {
+      document.getElementById('loading').style.display = 'none';
+      document.getElementById('card').style.display = 'block';
+      document.getElementById('refVal').textContent = data.booking_ref || '—';
+      document.getElementById('datesVal').textContent = `${fmtDate(data.checkin)} → ${fmtDate(data.checkout)}`;
+      document.getElementById('totalVal').textContent = money(data.total_amount);
+      document.getElementById('paidVal').textContent = money(data.amount_paid);
+
+      if (data.outstanding > 0) {
+        document.getElementById('outstandingLabel').textContent = 'Outstanding balance';
+        document.getElementById('outstandingVal').textContent = money(data.outstanding);
+        const note = document.getElementById('balanceNote');
+        note.style.display = 'block';
+        note.innerHTML = data.balance_due_date
+          ? `The remaining <strong>${money(data.outstanding)}</strong> is due by <strong>${fmtDate(data.balance_due_date)}</strong>. You can pay it any time before then using your booking reference and email on the "Pay Balance" page.`
+          : `The remaining <strong>${money(data.outstanding)}</strong> is still outstanding — you can pay it any time using your booking reference and email.`;
+        document.getElementById('payBalanceLink').style.display = 'inline-block';
+      } else {
+        document.getElementById('outstandingLabel').textContent = 'Outstanding';
+        document.getElementById('outstandingVal').textContent = 'Paid in full ✓';
+      }
+    }
+
+    fetchBooking(6);
   </script>
 </body>
 </html>

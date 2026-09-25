@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pay Your Balance — Cringley Cottage</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --ink: #232120; --cream: #f3ede3; --stone: #dfd8cb;
+    --sage: #5e7a52; --sage-light: #84a472; --muted: #7a6f60;
+  }
+  body {
+    font-family: 'DM Sans', sans-serif; background: var(--ink); color: var(--cream);
+    min-height: 100vh; display: flex; align-items: center; justify-content: center;
+    padding: 2.5rem 6%; line-height: 1.7;
+  }
+  .box { width: 100%; max-width: 420px; }
+  h1 { font-family: 'Cormorant Garamond', serif; font-weight: 600; font-size: 1.8rem; margin-bottom: 0.3rem; text-align: center; }
+  p.sub { text-align: center; color: rgba(247,242,234,0.5); font-size: 0.85rem; margin-bottom: 2rem; }
+  label { display: block; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; color: rgba(247,242,234,0.55); margin-bottom: 0.4rem; }
+  input {
+    width: 100%; background: rgba(247,242,234,0.07); border: 1px solid rgba(247,242,234,0.15);
+    color: var(--cream); padding: 0.75rem 0.9rem; font-family: 'DM Sans', sans-serif;
+    font-size: 0.9rem; border-radius: 2px; outline: none; margin-bottom: 1.1rem;
+  }
+  input:focus { border-color: var(--sage); }
+  button {
+    width: 100%; background: var(--sage); color: var(--cream); border: none;
+    padding: 0.85rem; font-size: 0.8rem; letter-spacing: 0.08em; text-transform: uppercase;
+    border-radius: 2px; cursor: pointer;
+  }
+  button:hover { background: var(--sage-light); }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+  #err, #info {
+    display: none; font-size: 0.82rem; padding: 0.7rem 0.9rem; border-radius: 2px; margin-bottom: 1.1rem;
+  }
+  #err { background: rgba(180,80,60,0.15); border: 1px solid rgba(180,80,60,0.35); }
+  #info { background: rgba(94,122,82,0.15); border: 1px solid rgba(94,122,82,0.35); }
+  #result { display: none; }
+  .card { background: rgba(247,242,234,0.06); border: 1px solid rgba(247,242,234,0.12); border-radius: 4px; padding: 1.3rem 1.4rem; margin-bottom: 1.3rem; }
+  .row { display: flex; justify-content: space-between; padding: 0.4rem 0; font-size: 0.88rem; }
+  .row.total { border-top: 1px solid rgba(247,242,234,0.1); margin-top: 0.3rem; padding-top: 0.7rem; font-weight: 500; color: var(--sage-light); }
+  a.back { display: block; text-align: center; margin-top: 1.5rem; color: rgba(247,242,234,0.4); font-size: 0.78rem; text-decoration: none; }
+</style>
+</head>
+<body>
+  <div class="box">
+    <h1>Pay Your Balance</h1>
+    <p class="sub">Enter your booking reference and email to pay what's outstanding</p>
+
+    <div id="err"></div>
+    <div id="info"></div>
+
+    <form id="lookupForm">
+      <label>Booking reference</label>
+      <input type="text" id="bookingRef" placeholder="CC-2027-0001" required style="text-transform:uppercase">
+      <label>Email</label>
+      <input type="email" id="email" placeholder="you@example.com" required>
+      <button type="submit" id="lookupBtn">Find My Booking</button>
+    </form>
+
+    <div id="result">
+      <div class="card">
+        <div class="row"><span>Dates</span><span id="rDates"></span></div>
+        <div class="row"><span>Total cost</span><span id="rTotal"></span></div>
+        <div class="row"><span>Paid so far</span><span id="rPaid"></span></div>
+        <div class="row total"><span>Outstanding</span><span id="rOutstanding"></span></div>
+      </div>
+      <button id="payBtn">Pay Outstanding Balance</button>
+    </div>
+
+    <a href="index.html" class="back">&#8592; Back to site</a>
+  </div>
+
+  <script>
+    const SUPABASE_URL = 'https://yfeyswuxhgezkpcjhznp.supabase.co';
+    let currentBooking = null;
+
+    function money(n) { return '£' + Number(n).toFixed(2).replace(/\.00$/, ''); }
+    function fmtDate(d) {
+      return new Date(d + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+    }
+    function showErr(msg) {
+      const e = document.getElementById('err');
+      e.textContent = msg; e.style.display = 'block';
+      document.getElementById('info').style.display = 'none';
+    }
+    function showInfo(msg) {
+      const i = document.getElementById('info');
+      i.textContent = msg; i.style.display = 'block';
+      document.getElementById('err').style.display = 'none';
+    }
+
+    document.getElementById('lookupForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      document.getElementById('err').style.display = 'none';
+      document.getElementById('info').style.display = 'none';
+      document.getElementById('result').style.display = 'none';
+      const btn = document.getElementById('lookupBtn');
+      btn.disabled = true; btn.textContent = 'Looking up…';
+
+      try {
+        const res = await fetch(`${SUPABASE_URL}/functions/v1/lookup-booking`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            booking_ref: document.getElementById('bookingRef').value,
+            email: document.getElementById('email').value,
+          }),
+        });
+        const data = await res.json();
+        btn.disabled = false; btn.textContent = 'Find My Booking';
+
+        if (!data.ok) { showErr(data.error || 'Booking not found.'); return; }
+        currentBooking = data;
+
+        if (data.outstanding <= 0) {
+          showInfo(`This booking (${data.booking_ref}) is already paid in full — nothing outstanding.`);
+          return;
+        }
+
+        document.getElementById('rDates').textContent = `${fmtDate(data.checkin)} → ${fmtDate(data.checkout)}`;
+        document.getElementById('rTotal').textContent = money(data.total_amount);
+        document.getElementById('rPaid').textContent = money(data.amount_paid);
+        document.getElementById('rOutstanding').textContent = money(data.outstanding);
+        document.getElementById('result').style.display = 'block';
+      } catch (e) {
+        btn.disabled = false; btn.textContent = 'Find My Booking';
+        showErr('Something went wrong — please try again.');
+      }
+    });
+
+    document.getElementById('payBtn').addEventListener('click', async () => {
+      if (!currentBooking) return;
+      const btn = document.getElementById('payBtn');
+      btn.disabled = true; btn.textContent = 'Redirecting to payment…';
+      try {
+        const res = await fetch(`${SUPABASE_URL}/functions/v1/create-checkout-session`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            booking_id: currentBooking.booking_id,
+            purpose: 'balance',
+            return_origin: window.location.href.replace(/[^/]*$/, ''),
+          }),
+        });
+        const data = await res.json();
+        if (data.ok && data.checkout_url) {
+          window.location.href = data.checkout_url;
+        } else {
+          showErr(data.error || 'Could not start payment — please try again.');
+          btn.disabled = false; btn.textContent = 'Pay Outstanding Balance';
+        }
+      } catch (e) {
+        showErr('Something went wrong — please try again.');
+        btn.disabled = false; btn.textContent = 'Pay Outstanding Balance';
+      }
+    });
+  </script>
+</body>
+</html>

@@ -1229,10 +1229,10 @@
 
           <div id="bpExtraGuestsWrap" style="margin-top:1rem;"></div>
 
-          <div class="bp-field" style="margin:1rem 0 0.75rem;display:flex;align-items:center;gap:0.6rem;">
-            <input type="checkbox" id="bpHasDog" style="width:auto;">
-            <label for="bpHasDog" style="margin:0;">Bringing a dog?</label>
-          </div>
+          <label for="bpHasDog" style="margin:1rem 0 0.75rem;display:flex;align-items:center;gap:0.7rem;background:rgba(247,242,234,0.05);border:1px solid rgba(247,242,234,0.12);border-radius:2px;padding:0.75rem 0.9rem;cursor:pointer;">
+            <input type="checkbox" id="bpHasDog" style="width:20px;height:20px;flex-shrink:0;accent-color:var(--sage);cursor:pointer;">
+            <span>Bringing a dog?</span>
+          </label>
 
           <div class="bp-field" style="margin-bottom:1rem">
             <label>Anything to tell us?</label>
@@ -1706,9 +1706,10 @@
     wrap.insertAdjacentHTML('beforeend', `<p style="font-size:0.75rem;text-transform:uppercase;letter-spacing:0.08em;color:rgba(247,242,234,0.5);margin-bottom:0.6rem;">Other guests</p>`);
     for (let i = 0; i < extra; i++) {
       wrap.insertAdjacentHTML('beforeend', `
+        <p style="font-size:0.78rem;color:rgba(247,242,234,0.55);margin-bottom:0.4rem;">Guest ${i+2}</p>
         <div class="bp-row bp-extra-guest" style="margin-bottom:0.75rem;">
           <div class="bp-field">
-            <label>Guest ${i+2} — full name *</label>
+            <label>Full name *</label>
             <input type="text" class="bp-guest-name" required placeholder="Full name">
           </div>
           <div class="bp-field">
