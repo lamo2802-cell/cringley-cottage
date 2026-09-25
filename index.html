@@ -631,14 +631,11 @@
     cursor: not-allowed;
     text-decoration: line-through;
   }
-  .cal-day.checkout-only {
-    background: #edf3eb;
-    border: 1px dashed #5e7a52;
-    color: var(--sage);
-    cursor: pointer;
-    font-weight: 500;
+  .cal-day.no-price {
+    background: repeating-linear-gradient(45deg, transparent, transparent 4px, rgba(180,150,60,0.1) 4px, rgba(180,150,60,0.1) 8px);
+    color: rgba(122,112,96,0.4);
+    cursor: not-allowed;
   }
-  .cal-day.checkout-only:hover { background: var(--sage); color: var(--white); border-style: solid; }
   .cal-day.below-min {
     color: rgba(122,112,96,0.35);
     cursor: not-allowed;
@@ -1141,9 +1138,9 @@
         <div class="cal-legend">
           <div class="legend-item"><div class="legend-dot" style="background:var(--white);border:1px solid var(--stone)"></div> Available</div>
           <div class="legend-item"><div class="legend-dot" style="background:var(--sage)"></div> Selected</div>
-          <div class="legend-item"><div class="legend-dot" style="background:var(--white);border:1px dashed #5e7a52"></div> Checkout only</div>
           <div class="legend-item"><div class="legend-dot" style="background:rgba(122,112,96,0.15)"></div> Unavailable</div>
           <div class="legend-item" id="legendBelowMin" style="display:none"><div class="legend-dot" style="background:repeating-linear-gradient(45deg, transparent, transparent 3px, rgba(122,112,96,0.15) 3px, rgba(122,112,96,0.15) 6px)"></div> Below minimum stay</div>
+          <div class="legend-item" id="legendNoPrice" style="display:none"><div class="legend-dot" style="background:repeating-linear-gradient(45deg, transparent, transparent 3px, rgba(180,150,60,0.2) 3px, rgba(180,150,60,0.2) 6px)"></div> No price set</div>
         </div>
       </div>
     </div>
@@ -1436,6 +1433,10 @@
   }
   function nightRate(date)     { return getRateEntry(date).rate; }
   function getMinNights(date)  { return getRateEntry(date).minNights; }
+  function hasRate(date) {
+    const d = date.toISOString().slice(0,10);
+    return RATES.some(r => d >= r.from && d <= r.to);
+  }
 
   // ─── AVAILABILITY (Supabase) ─────────────────────────────────────
   let bookedRanges = [];
@@ -1477,6 +1478,28 @@
     return bookedRanges.some(r => date.getTime() === r.start.getTime());
   }
 
+  // A night that cannot be part of any stay at all: booked, blocks passing
+  // through (another stay's check-in day), or has no price defined.
+  function isBlockedNight(y, m, d) {
+    if (isFullyBooked(y, m, d)) return true;
+    if (isCheckoutOnly(y, m, d)) return true;
+    const date = new Date(y, m, d); date.setHours(0,0,0,0);
+    if (!hasRate(date)) return true;
+    return false;
+  }
+
+  // How many consecutive occupiable nights start at this date, capped for performance.
+  function maxConsecutiveNightsFrom(startDate) {
+    let count = 0;
+    const CAP = 30;
+    for (let i = 0; i < CAP; i++) {
+      const d = new Date(startDate); d.setDate(d.getDate() + i);
+      if (isBlockedNight(d.getFullYear(), d.getMonth(), d.getDate())) break;
+      count++;
+    }
+    return count;
+  }
+
   // ─── CALENDAR UI ────────────────────────────────────────────────
   const today = new Date(); today.setHours(0,0,0,0);
   let viewYear  = today.getFullYear();
@@ -1484,10 +1507,21 @@
   let selStart  = null;
   let selEnd    = null;
 
-  // Minimum days ahead a booking can start
-  const MIN_ADVANCE_DAYS = 2;
+  // Minimum nights ahead a booking can start — owner-configurable in admin.html
+  let MIN_ADVANCE_NIGHTS = 2;
+  async function loadBookingSettings() {
+    try {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/site_settings?select=min_advance_nights&id=eq.1`, {
+        headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` }
+      });
+      const rows = await res.json();
+      if (Array.isArray(rows) && rows[0] && typeof rows[0].min_advance_nights === 'number') {
+        MIN_ADVANCE_NIGHTS = rows[0].min_advance_nights;
+      }
+    } catch (e) { /* keep default */ }
+  }
   function tooSoon(date) {
-    const cutoff = new Date(today); cutoff.setDate(cutoff.getDate() + MIN_ADVANCE_DAYS);
+    const cutoff = new Date(today); cutoff.setDate(cutoff.getDate() + MIN_ADVANCE_NIGHTS);
     return date < cutoff;
   }
 
@@ -1502,52 +1536,60 @@
     }
     const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
 
-    // While picking a checkout date, work out the earliest valid checkout
-    // given the selected check-in's minimum-stay requirement.
     const pickingCheckout = !!(selStart && !selEnd);
     let sDateForMin = null, minNightsRequired = null;
     if (pickingCheckout) {
       sDateForMin = new Date(selStart.y, selStart.m, selStart.d); sDateForMin.setHours(0,0,0,0);
       minNightsRequired = getMinNights(sDateForMin);
     }
-    const legendBelowMin = document.getElementById('legendBelowMin');
-    if (legendBelowMin) legendBelowMin.style.display = pickingCheckout && minNightsRequired > 1 ? 'flex' : 'none';
+
+    let anyBelowMin = false, anyNoPrice = false;
 
     for (let d = 1; d <= daysInMonth; d++) {
       const el = document.createElement('div');
       el.className = 'cal-day';
       el.textContent = d;
       const thisDate = new Date(viewYear, viewMonth, d); thisDate.setHours(0,0,0,0);
-      const fullyBooked   = isFullyBooked(viewYear, viewMonth, d);
-      const checkoutOnly  = isCheckoutOnly(viewYear, viewMonth, d);
+      const fullyBooked = isFullyBooked(viewYear, viewMonth, d);
+      const priced       = hasRate(thisDate);
       const past          = thisDate < today;
       const soon          = tooSoon(thisDate);
 
-      const nightsIfCheckout = pickingCheckout ? Math.round((thisDate - sDateForMin) / 86400000) : null;
-      const belowMin = pickingCheckout && nightsIfCheckout > 0 && nightsIfCheckout < minNightsRequired;
-
       if (fullyBooked) {
         el.classList.add('booked');
-      } else if (belowMin) {
-        el.classList.add('below-min');
-        el.title = `Minimum stay for these dates is ${minNightsRequired} nights`;
-      } else if (checkoutOnly) {
-        if (past || soon) {
-          // Past checkout-only dates — greyed out, not selectable
-          el.classList.add('past');
-        } else {
-          // Future checkout-only: dashed sage border, selectable as checkout only
-          el.classList.add('checkout-only');
-          el.title = 'Available as checkout date only';
-          el.addEventListener('click', () => selectDay(viewYear, viewMonth, d));
-        }
       } else if (past || soon) {
         el.classList.add('past');
-        if (soon && !past) el.title = 'Minimum 2 days notice required';
+        if (soon && !past) el.title = `Minimum ${MIN_ADVANCE_NIGHTS} night${MIN_ADVANCE_NIGHTS === 1 ? '' : 's'} notice required`;
+      } else if (!priced) {
+        el.classList.add('no-price');
+        el.title = 'No price set for this date';
+        anyNoPrice = true;
+      } else if (pickingCheckout) {
+        const nights = Math.round((thisDate - sDateForMin) / 86400000);
+        const crossesBlocked = nights > 0 && rangeHasBlockedDates(sDateForMin, thisDate);
+        const belowMin = nights > 0 && nights < minNightsRequired;
+        if (nights > 0 && (belowMin || crossesBlocked)) {
+          el.classList.add('below-min');
+          el.title = belowMin ? `Minimum stay for these dates is ${minNightsRequired} nights` : 'Includes unavailable dates';
+          anyBelowMin = true;
+        } else {
+          el.classList.add('available');
+          el.addEventListener('click', () => selectDay(viewYear, viewMonth, d));
+        }
       } else {
-        el.classList.add('available');
-        el.addEventListener('click', () => selectDay(viewYear, viewMonth, d));
+        // Picking check-in: does a valid stay of at least this date's minimum fit here?
+        const requiredMin = getMinNights(thisDate);
+        const run = maxConsecutiveNightsFrom(thisDate);
+        if (run < requiredMin) {
+          el.classList.add('below-min');
+          el.title = `Minimum stay from this date is ${requiredMin} nights`;
+          anyBelowMin = true;
+        } else {
+          el.classList.add('available');
+          el.addEventListener('click', () => selectDay(viewYear, viewMonth, d));
+        }
       }
+
       if (thisDate.getTime() === today.getTime()) el.classList.add('today');
       if (selStart) {
         const sDate = new Date(selStart.y, selStart.m, selStart.d);
@@ -1558,16 +1600,20 @@
       }
       body.appendChild(el);
     }
+
+    const legendBelowMin = document.getElementById('legendBelowMin');
+    if (legendBelowMin) legendBelowMin.style.display = anyBelowMin ? 'flex' : 'none';
+    const legendNoPrice = document.getElementById('legendNoPrice');
+    if (legendNoPrice) legendNoPrice.style.display = anyNoPrice ? 'flex' : 'none';
   }
 
   function rangeHasBlockedDates(start, end) {
-    // Check every night in the range — checkout date (end) may land on a range
-    // start (next guest check-in), that's allowed. Interior nights must be free.
+    // Every interior night must be occupiable; the checkout day itself is a
+    // boundary, not a night, so it's excluded from this check.
     const s = new Date(start); s.setHours(0,0,0,0);
     const e = new Date(end);   e.setHours(0,0,0,0);
     for (let d = new Date(s); d < e; d.setDate(d.getDate() + 1)) {
-      if (isFullyBooked(d.getFullYear(), d.getMonth(), d.getDate())) return true;
-      if (isCheckoutOnly(d.getFullYear(), d.getMonth(), d.getDate())) return true; // can't pass through
+      if (isBlockedNight(d.getFullYear(), d.getMonth(), d.getDate())) return true;
     }
     return false;
   }
@@ -2027,7 +2073,7 @@
   const _statusEl = document.getElementById('icalStatus');
   if (_statusEl) _statusEl.textContent = 'Loading availability…';
   (async () => {
-    try { await loadRatesFromSheet(); } catch(e) {}
+    try { await Promise.all([loadRatesFromSheet(), loadBookingSettings()]); } catch(e) {}
     await syncCalendar();
   })();
 

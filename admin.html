@@ -95,6 +95,18 @@
     </div>
   </header>
   <main>
+    <h2>Booking Settings</h2>
+    <p class="sub">Controls how close to check-in a booking can be made.</p>
+    <div id="settingsMsg" style="display:none;"></div>
+    <div style="background:#fff;border-radius:4px;padding:1.2rem 1.4rem;box-shadow:0 1px 4px rgba(0,0,0,0.08);margin-bottom:2.5rem;display:flex;gap:1rem;align-items:end;flex-wrap:wrap;">
+      <div>
+        <label>Minimum notice (nights before check-in)</label>
+        <input type="number" id="minAdvanceInput" min="0" style="width:120px;border:1px solid rgba(0,0,0,0.15);border-radius:2px;padding:0.55rem 0.6rem;font-family:'DM Sans',sans-serif;font-size:0.85rem;">
+      </div>
+      <button id="saveSettingsBtn" style="background:var(--sage);color:var(--cream);border:none;padding:0.6rem 1.1rem;border-radius:2px;cursor:pointer;font-size:0.8rem;">Save</button>
+      <p style="font-size:0.78rem;color:var(--muted);width:100%;margin-top:0.3rem;">0 allows same-day bookings, 1 means the earliest bookable date is tomorrow, and so on.</p>
+    </div>
+
     <h2>Seasonal Rates</h2>
     <p class="sub">These prices drive the booking calendar and payment amounts live on the site — changes take effect immediately.</p>
     <div id="msg"></div>
@@ -470,6 +482,34 @@
       }
     });
 
+    function showSettingsMsg(text, ok) {
+      const el = document.getElementById('settingsMsg');
+      el.textContent = text;
+      el.className = 'msg-box ' + (ok ? 'ok' : 'error');
+      el.style.display = 'block';
+      setTimeout(() => { el.style.display = 'none'; }, 5000);
+    }
+
+    async function loadSettings() {
+      const res = await authFetch('/rest/v1/site_settings?select=min_advance_nights&id=eq.1');
+      if (!res) return;
+      const rows = await res.json();
+      if (Array.isArray(rows) && rows[0]) {
+        document.getElementById('minAdvanceInput').value = rows[0].min_advance_nights;
+      }
+    }
+
+    document.getElementById('saveSettingsBtn').addEventListener('click', async () => {
+      const val = parseInt(document.getElementById('minAdvanceInput').value, 10);
+      if (isNaN(val) || val < 0) { showSettingsMsg('Enter a number of 0 or more.', false); return; }
+      const res = await authFetch('/rest/v1/site_settings?id=eq.1', {
+        method: 'PATCH',
+        body: JSON.stringify({ min_advance_nights: val }),
+      });
+      if (res && res.ok) showSettingsMsg('Saved.', true); else showSettingsMsg('Save failed.', false);
+    });
+
+    loadSettings();
     loadIcalSources();
     loadStaff();
     loadFireChecks();
