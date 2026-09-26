@@ -1484,6 +1484,25 @@
     return count;
   }
 
+  // Can this date ever be part of ANY stay — either starting a valid
+  // check-in of its own, or as the checkout of a stay starting on some
+  // earlier open date? A date that's neither (a lone open day pinched too
+  // tightly between two bookings) can never actually be booked at all, and
+  // should still read as unavailable rather than merely "not a valid
+  // check-in" — that reachable-only-as-a-later-checkout distinction is
+  // handled separately, at click time.
+  function isReachableDate(y, m, d) {
+    const date = new Date(y, m, d); date.setHours(0,0,0,0);
+    if (!isCheckoutOnly(y, m, d) && maxConsecutiveNightsFrom(date) >= getMinNights(date)) return true;
+    const LOOKBACK = 30;
+    for (let i = 1; i <= LOOKBACK; i++) {
+      const s = new Date(date); s.setDate(s.getDate() - i);
+      const run = maxConsecutiveNightsFrom(s);
+      if (i <= run && i >= getMinNights(s)) return true;
+    }
+    return false;
+  }
+
   // ─── CALENDAR UI ────────────────────────────────────────────────
   const today = new Date(); today.setHours(0,0,0,0);
   let viewYear  = today.getFullYear();
@@ -1607,12 +1626,18 @@
             el.addEventListener('click', () => selectDay(viewYear, viewMonth, d));
           }
         }
+      } else if (!isReachableDate(viewYear, viewMonth, d)) {
+        // Genuinely dead: not booked, but too tightly pinched between two
+        // bookings to ever be anyone's check-in OR checkout.
+        el.classList.add('below-min');
+        el.title = "This date can't be part of any stay — it falls in too small a gap between bookings";
+        anyBelowMin = true;
       } else {
-        // Picking check-in: any night that isn't itself part of someone
-        // else's stay is shown as open. Whether a full-length stay actually
-        // fits from here (the min-stay rule, or this being a turnover day
-        // that's checkout-only) is checked — with an explanation — only
-        // when it's clicked, rather than greying it out pre-emptively and
+        // Picking check-in: any night that can be part of SOME stay is
+        // shown as open. Whether a full-length stay actually starts here
+        // (the min-stay rule, or this being a turnover day that's
+        // checkout-only) is checked — with an explanation — only when
+        // it's clicked, rather than greying it out pre-emptively and
         // making the property look less available than it really is.
         el.classList.add('available');
         el.addEventListener('click', () => selectDay(viewYear, viewMonth, d));
