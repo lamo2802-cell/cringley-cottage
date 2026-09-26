@@ -1379,7 +1379,12 @@
       const ranges = rows.map(r => {
         const s = new Date(r.checkin + 'T00:00:00'); s.setHours(0,0,0,0);
         const e = new Date(r.checkout + 'T00:00:00'); e.setHours(0,0,0,0);
-        e.setDate(e.getDate() - 2); // checkout is exclusive; -1 more frees the checkout day itself
+        // checkin (s) is handled separately as "checkout-only" below (a new
+        // stay may end there on turnover morning), so the fully-blocked
+        // interior only needs to run through the last occupied night —
+        // checkout minus one. (Do not subtract further: that was leaving
+        // the last night of every 2+ night stay showing as available.)
+        e.setDate(e.getDate() - 1);
         return { start: s, end: e };
       }).filter(r => r.end >= r.start);
       bookedRanges = ranges;
