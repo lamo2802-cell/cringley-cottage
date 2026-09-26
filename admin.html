@@ -130,6 +130,36 @@
       <p style="font-size:0.78rem;color:var(--muted);width:100%;margin-top:0.3rem;">These drive the live pricing shown on the site and the actual amount charged — there's no separate copy to edit elsewhere.</p>
     </div>
 
+    <h2>Guest Messages</h2>
+    <p class="sub">Automatic emails sent to direct-booking guests — check-in day access details, and a check-out-eve reminder. Times are UK local time.</p>
+    <div id="guestMsgMsg" style="display:none;"></div>
+    <div style="background:#fff;border-radius:4px;padding:1.2rem 1.4rem;box-shadow:0 1px 4px rgba(0,0,0,0.08);margin-bottom:1.2rem;">
+      <div style="display:flex;gap:1rem;align-items:end;flex-wrap:wrap;margin-bottom:0.9rem;">
+        <h3 style="font-family:'Cormorant Garamond',serif;font-size:1.15rem;flex:1;min-width:200px;">Check-in day email</h3>
+        <div>
+          <label style="display:block;font-size:0.68rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted);margin-bottom:0.3rem;">Send at (UK time)</label>
+          <input type="time" id="checkinEmailTime" style="border:1px solid rgba(0,0,0,0.15);border-radius:2px;padding:0.55rem 0.6rem;font-family:'DM Sans',sans-serif;font-size:0.85rem;">
+        </div>
+      </div>
+      <label style="display:block;font-size:0.68rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted);margin-bottom:0.3rem;">Email text (key safe code, access instructions, etc. — blank lines start a new paragraph; lines starting with "- " become a bullet list)</label>
+      <textarea id="checkinEmailText" rows="6" style="width:100%;border:1px solid rgba(0,0,0,0.15);border-radius:2px;padding:0.6rem 0.7rem;font-family:'DM Sans',sans-serif;font-size:0.85rem;margin-bottom:0.6rem;"></textarea>
+      <button id="saveCheckinEmailBtn" style="background:var(--sage);color:var(--cream);border:none;padding:0.6rem 1.1rem;border-radius:2px;cursor:pointer;font-size:0.8rem;">Save</button>
+      <p style="font-size:0.78rem;color:var(--muted);margin-top:0.5rem;">Sent automatically on the day of check-in, once per booking.</p>
+    </div>
+    <div style="background:#fff;border-radius:4px;padding:1.2rem 1.4rem;box-shadow:0 1px 4px rgba(0,0,0,0.08);margin-bottom:2.5rem;">
+      <div style="display:flex;gap:1rem;align-items:end;flex-wrap:wrap;margin-bottom:0.9rem;">
+        <h3 style="font-family:'Cormorant Garamond',serif;font-size:1.15rem;flex:1;min-width:200px;">Check-out reminder email</h3>
+        <div>
+          <label style="display:block;font-size:0.68rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted);margin-bottom:0.3rem;">Send at (UK time)</label>
+          <input type="time" id="checkoutEmailTime" style="border:1px solid rgba(0,0,0,0.15);border-radius:2px;padding:0.55rem 0.6rem;font-family:'DM Sans',sans-serif;font-size:0.85rem;">
+        </div>
+      </div>
+      <label style="display:block;font-size:0.68rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted);margin-bottom:0.3rem;">Email text (lights, radiators, windows, key return, etc.)</label>
+      <textarea id="checkoutEmailText" rows="6" style="width:100%;border:1px solid rgba(0,0,0,0.15);border-radius:2px;padding:0.6rem 0.7rem;font-family:'DM Sans',sans-serif;font-size:0.85rem;margin-bottom:0.6rem;"></textarea>
+      <button id="saveCheckoutEmailBtn" style="background:var(--sage);color:var(--cream);border:none;padding:0.6rem 1.1rem;border-radius:2px;cursor:pointer;font-size:0.8rem;">Save</button>
+      <p style="font-size:0.78rem;color:var(--muted);margin-top:0.5rem;">Sent automatically the day before check-out, once per booking.</p>
+    </div>
+
     <h2>Seasonal Rates</h2>
     <p class="sub">These prices drive the booking calendar and payment amounts live on the site — changes take effect immediately.</p>
     <div id="msg"></div>
@@ -623,6 +653,51 @@
     loadSettings();
     loadIcalSources();
     loadStaff();
+
+    // ─── Guest messages (check-in / check-out emails) ────────────────
+    function showGuestMsgMsg(text, ok) {
+      const el = document.getElementById('guestMsgMsg');
+      el.textContent = text;
+      el.className = 'msg-box ' + (ok ? 'ok' : 'error');
+      el.style.display = 'block';
+      setTimeout(() => { el.style.display = 'none'; }, 5000);
+    }
+
+    async function loadGuestMessages() {
+      const res = await authFetch('/rest/v1/site_settings?select=checkin_email_time,checkout_email_time,checkin_email_text,checkout_email_text&id=eq.1');
+      if (!res) return;
+      const rows = await res.json();
+      if (Array.isArray(rows) && rows[0]) {
+        document.getElementById('checkinEmailTime').value = (rows[0].checkin_email_time || '08:00:00').slice(0, 5);
+        document.getElementById('checkoutEmailTime').value = (rows[0].checkout_email_time || '10:00:00').slice(0, 5);
+        document.getElementById('checkinEmailText').value = rows[0].checkin_email_text || '';
+        document.getElementById('checkoutEmailText').value = rows[0].checkout_email_text || '';
+      }
+    }
+
+    document.getElementById('saveCheckinEmailBtn').addEventListener('click', async () => {
+      const time = document.getElementById('checkinEmailTime').value;
+      const text = document.getElementById('checkinEmailText').value;
+      if (!time) { showGuestMsgMsg('Pick a send time.', false); return; }
+      const res = await authFetch('/rest/v1/site_settings?id=eq.1', {
+        method: 'PATCH',
+        body: JSON.stringify({ checkin_email_time: time, checkin_email_text: text }),
+      });
+      if (res && res.ok) showGuestMsgMsg('Check-in email saved.', true); else showGuestMsgMsg('Save failed.', false);
+    });
+
+    document.getElementById('saveCheckoutEmailBtn').addEventListener('click', async () => {
+      const time = document.getElementById('checkoutEmailTime').value;
+      const text = document.getElementById('checkoutEmailText').value;
+      if (!time) { showGuestMsgMsg('Pick a send time.', false); return; }
+      const res = await authFetch('/rest/v1/site_settings?id=eq.1', {
+        method: 'PATCH',
+        body: JSON.stringify({ checkout_email_time: time, checkout_email_text: text }),
+      });
+      if (res && res.ok) showGuestMsgMsg('Check-out email saved.', true); else showGuestMsgMsg('Save failed.', false);
+    });
+
+    loadGuestMessages();
     const REVIEW_SOURCE_LABELS = { airbnb: 'Airbnb', booking_com: 'Booking.com', direct: 'Direct Guest', google: 'Google' };
 
     function showReviewsMsg(text, ok) {
