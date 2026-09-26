@@ -640,6 +640,13 @@
     box-shadow: 0 1px 3px rgba(0,0,0,0.06);
   }
   .cal-day.available:hover { background: var(--sage); color: var(--white); border-color: var(--sage); box-shadow: none; }
+  .cal-day.restart-checkin {
+    background: var(--cream);
+    color: var(--muted);
+    cursor: pointer;
+    border: 1px dashed var(--stone);
+  }
+  .cal-day.restart-checkin:hover { border-color: var(--sage-light); color: var(--sage); }
   .cal-day.empty { cursor: default; border: none; }
   .cal-day.booked {
     background: repeating-linear-gradient(45deg, transparent, transparent 4px, rgba(122,112,96,0.08) 4px, rgba(122,112,96,0.08) 8px);
@@ -1145,6 +1152,7 @@
           <div class="legend-item"><div class="legend-dot" style="background:rgba(122,112,96,0.15)"></div> Unavailable</div>
           <div class="legend-item" id="legendBelowMin" style="display:none"><div class="legend-dot" style="background:repeating-linear-gradient(45deg, transparent, transparent 3px, rgba(122,112,96,0.15) 3px, rgba(122,112,96,0.15) 6px)"></div> Below minimum stay</div>
           <div class="legend-item" id="legendNoPrice" style="display:none"><div class="legend-dot" style="background:repeating-linear-gradient(45deg, transparent, transparent 3px, rgba(180,150,60,0.2) 3px, rgba(180,150,60,0.2) 6px)"></div> No price set</div>
+          <div class="legend-item" id="legendRestartCheckin" style="display:none"><div class="legend-dot" style="background:var(--cream);border:1px dashed var(--stone)"></div> Not a checkout option — click to change check-in</div>
         </div>
       </div>
     </div>
@@ -1556,7 +1564,7 @@
       minNightsRequired = getMinNights(sDateForMin);
     }
 
-    let anyBelowMin = false, anyNoPrice = false;
+    let anyBelowMin = false, anyNoPrice = false, anyRestartCheckin = false;
 
     for (let d = 1; d <= daysInMonth; d++) {
       const el = document.createElement('div');
@@ -1579,15 +1587,25 @@
         anyNoPrice = true;
       } else if (pickingCheckout) {
         const nights = Math.round((thisDate - sDateForMin) / 86400000);
-        const crossesBlocked = nights > 0 && rangeHasBlockedDates(sDateForMin, thisDate);
-        const belowMin = nights > 0 && nights < minNightsRequired;
-        if (nights > 0 && (belowMin || crossesBlocked)) {
-          el.classList.add('below-min');
-          el.title = belowMin ? `Minimum stay for these dates is ${minNightsRequired} nights` : 'Includes unavailable dates';
-          anyBelowMin = true;
-        } else {
-          el.classList.add('available');
+        if (nights < 0) {
+          // Before the chosen check-in — not a checkout option. Shown
+          // distinctly from a real checkout candidate: clicking it restarts
+          // the selection with this as a new, earlier check-in date.
+          el.classList.add('restart-checkin');
+          el.title = 'Click to use this as your check-in date instead';
           el.addEventListener('click', () => selectDay(viewYear, viewMonth, d));
+          anyRestartCheckin = true;
+        } else {
+          const crossesBlocked = nights > 0 && rangeHasBlockedDates(sDateForMin, thisDate);
+          const belowMin = nights > 0 && nights < minNightsRequired;
+          if (nights > 0 && (belowMin || crossesBlocked)) {
+            el.classList.add('below-min');
+            el.title = belowMin ? `Minimum stay for these dates is ${minNightsRequired} nights` : 'Includes unavailable dates';
+            anyBelowMin = true;
+          } else {
+            el.classList.add('available');
+            el.addEventListener('click', () => selectDay(viewYear, viewMonth, d));
+          }
         }
       } else {
         // Picking check-in: does a valid stay of at least this date's minimum fit here?
@@ -1618,6 +1636,8 @@
     if (legendBelowMin) legendBelowMin.style.display = anyBelowMin ? 'flex' : 'none';
     const legendNoPrice = document.getElementById('legendNoPrice');
     if (legendNoPrice) legendNoPrice.style.display = anyNoPrice ? 'flex' : 'none';
+    const legendRestartCheckin = document.getElementById('legendRestartCheckin');
+    if (legendRestartCheckin) legendRestartCheckin.style.display = anyRestartCheckin ? 'flex' : 'none';
   }
 
   function rangeHasBlockedDates(start, end) {
