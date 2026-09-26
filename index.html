@@ -767,42 +767,12 @@
   }
 
   /* CONTACT */
-  .form-intro { margin-bottom: 1.5rem; }
-  .form-step-label {
-    font-size: 0.7rem; letter-spacing: 0.18em; text-transform: uppercase;
-    color: var(--sage); font-weight: 500;
-  }
   #contact {
     background: var(--cream);
     padding: var(--section-pad);
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 8%;
-    align-items: start;
+    max-width: 640px;
+    margin: 0 auto;
   }
-  .contact-form-wrap { background: var(--white); padding: 2.5rem; border-radius: 2px; }
-  .form-group { margin-bottom: 1.2rem; }
-  .form-group label {
-    display: block;
-    font-size: 0.72rem; letter-spacing: 0.12em; text-transform: uppercase;
-    color: var(--muted); margin-bottom: 0.5rem;
-  }
-  .form-group input, .form-group textarea, .form-group select {
-    width: 100%;
-    background: var(--cream);
-    border: 1px solid var(--stone);
-    color: var(--ink);
-    padding: 0.75rem 1rem;
-    font-family: 'DM Sans', sans-serif;
-    font-size: 0.9rem;
-    border-radius: 2px;
-    outline: none;
-    transition: border-color 0.2s;
-    -webkit-appearance: none;
-  }
-  .form-group input:focus, .form-group textarea:focus, .form-group select:focus { border-color: var(--sage); }
-  .form-group textarea { resize: vertical; min-height: 120px; }
-  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
   .contact-info h3 {
     font-family: 'Cormorant Garamond', serif;
     font-size: 2rem; font-weight: 600;
@@ -872,7 +842,7 @@
   /* RESPONSIVE */
   @media (max-width: 860px) {
     :root { --section-pad: 4.5rem 5%; }
-    #about, #contact { grid-template-columns: 1fr; }
+    #about { grid-template-columns: 1fr; }
     .about-img-badge { right: 1rem; }
     .cal-wrap { grid-template-columns: 1fr; }
     .hero-stats { display: none; }
@@ -1313,72 +1283,6 @@
       <div style="display:flex;gap:5px;margin-top:1rem;" id="reviewDots"></div>
       <a href="reviews-policy.html" style="display:inline-block;margin-top:0.9rem;font-size:0.72rem;letter-spacing:0.1em;text-transform:uppercase;color:rgba(247,242,234,0.45);text-decoration:underline;">Review Policy</a>
     </div>
-  </div>
-  <div class="contact-form-wrap">
-    <div class="form-intro">
-      <span class="form-step-label">Contact Us</span>
-      <p style="font-size:0.82rem;color:var(--muted);margin-top:0.3rem">General questions? Send us a message here. To book specific dates, use the availability checker above.</p>
-    </div>
-    <form id="enquiryForm" action="https://formspree.io/f/mwvzegqj" method="POST">
-      <div class="form-row">
-        <div class="form-group">
-          <label>First Name *</label>
-          <input type="text" id="enqName" name="first_name" placeholder="Jane" required>
-        </div>
-        <div class="form-group">
-          <label>Last Name *</label>
-          <input type="text" name="last_name" placeholder="Smith" required>
-        </div>
-      </div>
-      <div class="form-group">
-        <label>Email Address *</label>
-        <input type="email" name="email" placeholder="jane@example.com" required>
-      </div>
-      <div class="form-group">
-        <label>Phone Number</label>
-        <input type="tel" name="phone" placeholder="+44 7700 900000">
-      </div>
-      <div class="form-row">
-        <div class="form-group">
-          <label>Arrival Date *</label>
-          <input type="date" id="enqArrival" name="arrival" required>
-        </div>
-        <div class="form-group">
-          <label>Departure Date *</label>
-          <input type="date" id="enqDeparture" name="departure" required>
-        </div>
-      </div>
-      <div class="form-row">
-        <div class="form-group">
-          <label>Guests *</label>
-          <select id="enqGuests" name="guests" required>
-            <option value="">Select...</option>
-            <option>1 guest</option>
-            <option>2 guests</option>
-            <option>3 guests</option>
-            <option>4 guests</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label>Bringing a dog?</label>
-          <select name="dog">
-            <option value="No">No</option>
-            <option value="Yes — 1 dog">Yes — 1 dog</option>
-            <option value="Yes — 2 dogs">Yes — 2 dogs</option>
-          </select>
-        </div>
-      </div>
-      <div class="form-group">
-        <label>Estimated price (from calculator)</label>
-        <input type="text" id="enqPrice" name="estimated_price" placeholder="e.g. £480 for 3 nights" readonly style="background:var(--stone);cursor:default;">
-      </div>
-      <div class="form-group">
-        <label>Message or Questions</label>
-        <textarea name="message" placeholder="Tell us a bit about your trip, any special requirements or questions..."></textarea>
-      </div>
-      <button type="submit" class="btn-primary" style="width:100%;text-align:center;padding:1rem;border:none;cursor:pointer;">Send Enquiry →</button>
-      <p style="text-align:center;font-size:0.72rem;color:var(--muted);margin-top:0.8rem">We'll reply within 24 hours · No payment taken here</p>
-    </form>
   </div>
 </section>
 
