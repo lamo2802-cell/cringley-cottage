@@ -563,6 +563,27 @@
     border-radius: 2px;
     overflow: hidden;
   }
+  .cal-selection {
+    background: var(--white);
+    border-bottom: 1px solid var(--stone);
+    padding: 0.9rem 1.5rem;
+    display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+    flex-wrap: wrap;
+  }
+  .cal-selection-dates { display: flex; align-items: center; gap: 0.9rem; }
+  .cal-selection-field { display: flex; flex-direction: column; gap: 0.15rem; }
+  .cal-selection-label {
+    font-size: 0.66rem; letter-spacing: 0.1em; text-transform: uppercase;
+    color: var(--muted);
+  }
+  .cal-selection-field span:last-child { font-size: 0.95rem; color: var(--ink); font-weight: 500; }
+  .cal-selection-arrow { color: var(--stone); font-size: 0.9rem; margin-top: 1rem; }
+  .cal-clear-btn {
+    background: none; border: none; cursor: pointer;
+    font-size: 0.75rem; letter-spacing: 0.06em; text-transform: uppercase;
+    color: var(--sage); text-decoration: underline; padding: 0;
+  }
+  .cal-clear-btn:hover { color: var(--ink); }
   .cal-header {
     background: var(--ink);
     display: flex; align-items: center; justify-content: space-between;
@@ -1095,6 +1116,20 @@
     <!-- Calendar -->
     <div>
       <div class="calendar" id="calendar">
+        <div class="cal-selection" id="calSelection">
+          <div class="cal-selection-dates">
+            <div class="cal-selection-field">
+              <span class="cal-selection-label">Check-in</span>
+              <span id="calSelCheckin">Select a date</span>
+            </div>
+            <div class="cal-selection-arrow">&rarr;</div>
+            <div class="cal-selection-field">
+              <span class="cal-selection-label">Check-out</span>
+              <span id="calSelCheckout">&mdash;</span>
+            </div>
+          </div>
+          <button type="button" id="calClearBtn" class="cal-clear-btn" style="display:none">Clear dates</button>
+        </div>
         <div class="cal-header">
           <button class="cal-nav-btn" id="prevMonth">&#8249;</button>
           <span class="cal-month-label" id="calMonthLabel">April 2026</span>
@@ -1351,14 +1386,26 @@
     } catch(e) { /* use fallback */ }
   }
 
+  // A Date built from local y/m/d fields must round-trip back to the same
+  // y/m/d — toISOString() converts to UTC first, which silently shifts the
+  // date back a day for anyone browsing from a UTC+ timezone (the UK included,
+  // for most of the year under BST). Every date this page submits or looks
+  // up a rate for goes through this instead.
+  function toLocalISODate(date) {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }
+
   function getRateEntry(date) {
-    const d = date.toISOString().slice(0,10);
+    const d = toLocalISODate(date);
     return RATES.find(r => d >= r.from && d <= r.to) || { rate: 120, minNights: 2 };
   }
   function nightRate(date)     { return getRateEntry(date).rate; }
   function getMinNights(date)  { return getRateEntry(date).minNights; }
   function hasRate(date) {
-    const d = date.toISOString().slice(0,10);
+    const d = toLocalISODate(date);
     return RATES.some(r => d >= r.from && d <= r.to);
   }
 
@@ -1584,8 +1631,54 @@
     return false;
   }
 
+  const CAL_MONTHS_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  function fmtSelLabel(y, m, d) {
+    return `${d} ${CAL_MONTHS_SHORT[m]} ${y}`;
+  }
+
+  function updateSelectionReadout() {
+    const ciEl = document.getElementById('calSelCheckin');
+    const coEl = document.getElementById('calSelCheckout');
+    const clearBtn = document.getElementById('calClearBtn');
+    if (!ciEl) return;
+    ciEl.textContent = selStart ? fmtSelLabel(selStart.y, selStart.m, selStart.d) : 'Select a date';
+    coEl.textContent = selEnd ? fmtSelLabel(selEnd.y, selEnd.m, selEnd.d) : '—';
+    clearBtn.style.display = selStart ? 'inline' : 'none';
+  }
+
+  function clearDateSelection() {
+    selStart = null; selEnd = null;
+    buildCal();
+    updateSelectionReadout();
+    document.getElementById('bpCheckin').value = '';
+    document.getElementById('bpCheckout').value = '';
+    setBpSubmitEnabled(false);
+  }
+  document.getElementById('calClearBtn').addEventListener('click', clearDateSelection);
+
   function selectDay(y, m, d) {
     const clicked = new Date(y, m, d); clicked.setHours(0,0,0,0);
+
+    // Clicking a date that's already selected deselects it, rather than
+    // being a no-op or silently re-picking the same range.
+    if (selStart && !selEnd) {
+      const sDate = new Date(selStart.y, selStart.m, selStart.d);
+      if (clicked.getTime() === sDate.getTime()) { clearDateSelection(); return; }
+    } else if (selStart && selEnd) {
+      const sDate = new Date(selStart.y, selStart.m, selStart.d);
+      const eDate = new Date(selEnd.y, selEnd.m, selEnd.d);
+      if (clicked.getTime() === sDate.getTime()) { clearDateSelection(); return; }
+      if (clicked.getTime() === eDate.getTime()) {
+        // Drop just the check-out, keep the check-in so a new one can be chosen.
+        selEnd = null;
+        buildCal();
+        updateSelectionReadout();
+        document.getElementById('bpCheckout').value = '';
+        setBpSubmitEnabled(false);
+        return;
+      }
+    }
+
     if (!selStart || (selStart && selEnd)) {
       // Don't allow checkout-only dates as a check-in
       if (isCheckoutOnly(y, m, d)) {
@@ -1608,17 +1701,21 @@
         if (rangeHasBlockedDates(sDate, clicked)) {
           showToast('Your selected range includes unavailable dates — please choose different dates.');
           selStart = null; selEnd = null;
-          buildCal(); return;
+          buildCal(); updateSelectionReadout(); return;
         }
         selEnd = {y,m,d};
       }
     }
     buildCal();
+    updateSelectionReadout();
     if (selStart && selEnd) {
-      const fmt = dt => dt.toISOString().slice(0,10);
-      document.getElementById('bpCheckin').value  = fmt(new Date(selStart.y, selStart.m, selStart.d));
-      document.getElementById('bpCheckout').value = fmt(new Date(selEnd.y, selEnd.m, selEnd.d));
+      document.getElementById('bpCheckin').value  = toLocalISODate(new Date(selStart.y, selStart.m, selStart.d));
+      document.getElementById('bpCheckout').value = toLocalISODate(new Date(selEnd.y, selEnd.m, selEnd.d));
       updateSummary();
+    } else if (selStart) {
+      document.getElementById('bpCheckin').value = toLocalISODate(new Date(selStart.y, selStart.m, selStart.d));
+      document.getElementById('bpCheckout').value = '';
+      setBpSubmitEnabled(false);
     }
   }
 
