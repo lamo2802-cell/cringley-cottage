@@ -1234,7 +1234,7 @@
 
           <label for="bpHasDog" style="margin:1rem 0 0.75rem;display:flex;align-items:center;gap:0.7rem;background:rgba(247,242,234,0.05);border:1px solid rgba(247,242,234,0.12);border-radius:2px;padding:0.75rem 0.9rem;cursor:pointer;">
             <input type="checkbox" id="bpHasDog" style="width:20px;height:20px;flex-shrink:0;accent-color:var(--sage);cursor:pointer;">
-            <span>Bringing a dog?</span>
+            <span id="bpHasDogLabel">Bringing a dog?</span>
           </label>
 
           <div class="bp-field" style="margin-bottom:1rem">
@@ -1511,9 +1511,11 @@
   // Owner-configurable in admin.html — Booking Settings
   let MIN_ADVANCE_NIGHTS = 2;
   let FULL_PAYMENT_WINDOW_DAYS = 14;
+  let DOG_SURCHARGE_ENABLED = false;
+  let DOG_SURCHARGE_AMOUNT = 0;
   async function loadBookingSettings() {
     try {
-      const res = await fetch(`${SUPABASE_URL}/rest/v1/site_settings?select=min_advance_nights,deposit_percent,full_payment_window_days,week_discount_percent&id=eq.1`, {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/site_settings?select=min_advance_nights,deposit_percent,full_payment_window_days,week_discount_percent,dog_surcharge_enabled,dog_surcharge_amount&id=eq.1`, {
         headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` }
       });
       const rows = await res.json();
@@ -1523,6 +1525,8 @@
         if (typeof s.deposit_percent === 'number') DEPOSIT_RATE = s.deposit_percent / 100;
         if (typeof s.full_payment_window_days === 'number') FULL_PAYMENT_WINDOW_DAYS = s.full_payment_window_days;
         if (typeof s.week_discount_percent === 'number') WEEK_DISCOUNT = s.week_discount_percent / 100;
+        DOG_SURCHARGE_ENABLED = !!s.dog_surcharge_enabled;
+        if (typeof s.dog_surcharge_amount === 'number') DOG_SURCHARGE_AMOUNT = s.dog_surcharge_amount;
       }
     } catch (e) { /* keep defaults */ }
     applyPricingCopy();
@@ -1550,6 +1554,9 @@
 
     const contactIntro = document.getElementById('contactIntro');
     if (contactIntro) contactIntro.textContent = 'Get in touch with any questions about your stay — to book specific dates, use the availability checker above.';
+
+    const bpDogLabel = document.getElementById('bpHasDogLabel');
+    if (bpDogLabel) bpDogLabel.textContent = (DOG_SURCHARGE_ENABLED && DOG_SURCHARGE_AMOUNT > 0) ? `Bringing a dog? (+£${DOG_SURCHARGE_AMOUNT})` : 'Bringing a dog?';
   }
   function tooSoon(date) {
     const cutoff = new Date(today); cutoff.setDate(cutoff.getDate() + MIN_ADVANCE_NIGHTS);
@@ -1741,6 +1748,9 @@
 
   document.getElementById('bpCheckin').addEventListener('change', updateSummary);
   document.getElementById('bpCheckout').addEventListener('change', updateSummary);
+  document.getElementById('bpHasDog').addEventListener('change', () => {
+    if (document.getElementById('bpStep2').style.display !== 'none') refreshStep2PriceSummary();
+  });
 
   let activeHold = null; // { id, expiresAt }
   let holdTimerInterval = null;
@@ -1751,6 +1761,7 @@
     const ci = document.getElementById('bpCheckin').value;
     const co = document.getElementById('bpCheckout').value;
     const guests = parseInt(document.getElementById('bpGuests').value, 10) || 1;
+    const hasDog = document.getElementById('bpHasDog').checked;
     const nights = Math.round((new Date(co) - new Date(ci)) / 86400000);
     let total = 0;
     for (let i = 0; i < nights; i++) {
@@ -1760,12 +1771,14 @@
     const isWeek = nights >= 7;
     const afterWeek = total - (isWeek ? Math.round(total * WEEK_DISCOUNT) : 0);
     const discountAmt = appliedDiscountPercent > 0 ? Math.round(afterWeek * (appliedDiscountPercent / 100)) : 0;
-    const finalTotal = Math.max(0, afterWeek - discountAmt);
+    // The pet surcharge is a flat fee on top — it isn't itself subject to the week or code discount.
+    const dogSurcharge = (hasDog && DOG_SURCHARGE_ENABLED) ? DOG_SURCHARGE_AMOUNT : 0;
+    const finalTotal = Math.max(0, afterWeek - discountAmt) + dogSurcharge;
     const today0 = new Date(); today0.setHours(0,0,0,0);
     const daysUntil = Math.round((new Date(ci) - today0) / 86400000);
     const isFullPayment = daysUntil < FULL_PAYMENT_WINDOW_DAYS;
     const amountDue = finalTotal <= 0 ? 0 : (isFullPayment ? finalTotal : Math.round(finalTotal * DEPOSIT_RATE));
-    return { ci, co, nights, guests, total, isWeek, afterWeek, discountAmt, finalTotal, isFullPayment, amountDue };
+    return { ci, co, nights, guests, total, isWeek, afterWeek, discountAmt, dogSurcharge, finalTotal, isFullPayment, amountDue };
   }
 
   function refreshStep2PriceSummary() {
@@ -1773,6 +1786,7 @@
     const depositPct = Math.round(DEPOSIT_RATE * 100);
     let html = `${p.ci} → ${p.co} · ${p.nights} night${p.nights!==1?'s':''} · ${p.guests} guest${p.guests!==1?'s':''}<br>`;
     if (p.discountAmt > 0) html += `Discount code applied (${appliedDiscountCode}): −£${p.discountAmt}<br>`;
+    if (p.dogSurcharge > 0) html += `Pet surcharge: +£${p.dogSurcharge}<br>`;
     if (p.finalTotal <= 0) {
       html += `Total £0 · Fully covered by discount code — no payment needed`;
     } else {

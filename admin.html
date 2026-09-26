@@ -271,6 +271,19 @@
       <p style="font-size:0.78rem;color:var(--muted);width:100%;margin-top:0.3rem;">These drive the live pricing shown on the site and the actual amount charged — there's no separate copy to edit elsewhere.</p>
     </div>
 
+    <div style="background:#fff;border-radius:4px;padding:1.2rem 1.4rem;box-shadow:0 1px 4px rgba(0,0,0,0.08);margin-bottom:2.5rem;display:flex;gap:1rem;align-items:end;flex-wrap:wrap;">
+      <label style="display:flex;align-items:center;gap:0.6rem;cursor:pointer;">
+        <input type="checkbox" id="dogSurchargeEnabledInput" style="width:20px;height:20px;accent-color:var(--sage);cursor:pointer;">
+        <span style="font-size:0.85rem;">Charge a pet surcharge when a guest brings a dog</span>
+      </label>
+      <div>
+        <label>Surcharge (£, flat fee per stay)</label>
+        <input type="number" id="dogSurchargeAmountInput" min="0" step="0.5" style="width:140px;border:1px solid rgba(0,0,0,0.15);border-radius:2px;padding:0.55rem 0.6rem;font-family:'DM Sans',sans-serif;font-size:0.85rem;">
+      </div>
+      <button id="saveDogSurchargeBtn" style="background:var(--sage);color:var(--cream);border:none;padding:0.6rem 1.1rem;border-radius:2px;cursor:pointer;font-size:0.8rem;">Save</button>
+      <p style="font-size:0.78rem;color:var(--muted);width:100%;margin-top:0.3rem;">Off by default — no charge for dogs unless you turn this on. When on, it's added once per stay (not per night) whenever a guest ticks "Bringing a dog?" at checkout.</p>
+    </div>
+
     <h2>Guest Messages</h2>
     <p class="sub">Automatic emails sent to direct-booking guests — check-in day access details, and a check-out-eve reminder. Times are UK local time.</p>
     <div id="guestMsgMsg" style="display:none;"></div>
@@ -782,7 +795,7 @@
     }
 
     async function loadSettings() {
-      const res = await authFetch('/rest/v1/site_settings?select=min_advance_nights,deposit_percent,full_payment_window_days,week_discount_percent&id=eq.1');
+      const res = await authFetch('/rest/v1/site_settings?select=min_advance_nights,deposit_percent,full_payment_window_days,week_discount_percent,dog_surcharge_enabled,dog_surcharge_amount&id=eq.1');
       if (!res) return;
       const rows = await res.json();
       if (Array.isArray(rows) && rows[0]) {
@@ -790,6 +803,8 @@
         document.getElementById('depositPercentInput').value = rows[0].deposit_percent;
         document.getElementById('fullPaymentDaysInput').value = rows[0].full_payment_window_days;
         document.getElementById('weekDiscountInput').value = rows[0].week_discount_percent;
+        document.getElementById('dogSurchargeEnabledInput').checked = !!rows[0].dog_surcharge_enabled;
+        document.getElementById('dogSurchargeAmountInput').value = rows[0].dog_surcharge_amount;
       }
     }
 
@@ -810,6 +825,17 @@
         }),
       });
       if (res && res.ok) showSettingsMsg('Saved.', true); else showSettingsMsg('Save failed.', false);
+    });
+
+    document.getElementById('saveDogSurchargeBtn').addEventListener('click', async () => {
+      const enabled = document.getElementById('dogSurchargeEnabledInput').checked;
+      const amount = parseFloat(document.getElementById('dogSurchargeAmountInput').value);
+      if (enabled && (isNaN(amount) || amount < 0)) { showSettingsMsg('Enter a surcharge amount of 0 or more.', false); return; }
+      const res = await authFetch('/rest/v1/site_settings?id=eq.1', {
+        method: 'PATCH',
+        body: JSON.stringify({ dog_surcharge_enabled: enabled, dog_surcharge_amount: isNaN(amount) ? 0 : amount }),
+      });
+      if (res && res.ok) showSettingsMsg('Pet surcharge saved.', true); else showSettingsMsg('Save failed.', false);
     });
 
     loadSettings();
