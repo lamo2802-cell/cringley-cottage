@@ -92,6 +92,9 @@
   .fire-item-row .ans.no { color: #b4503c; }
   .fire-item-row .ans.yes { color: #5e7a52; }
   .fire-actions-list { margin-top:0.6rem; padding-top:0.6rem; border-top:1px solid rgba(0,0,0,0.08); }
+  .metric-card { background: #fff; border-radius: 4px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); padding: 1rem 1.2rem; }
+  .metric-card .metric-label { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); margin-bottom: 0.4rem; }
+  .metric-card .metric-value { font-family: 'Cormorant Garamond', serif; font-weight: 600; font-size: 1.6rem; color: var(--ink); }
 </style>
 </head>
 <body>
@@ -200,6 +203,58 @@
       <label>Review text</label>
       <textarea id="newRevText" rows="3" style="width:100%;border:1px solid rgba(0,0,0,0.15);border-radius:2px;padding:0.6rem 0.7rem;font-family:'DM Sans',sans-serif;font-size:0.88rem;margin-bottom:0.9rem;"></textarea>
       <button id="addReviewBtn" style="background:var(--sage);color:var(--cream);border:none;padding:0.6rem 1.3rem;border-radius:2px;cursor:pointer;font-size:0.8rem;">Add Review</button>
+    </div>
+
+    <h2 style="margin-top:2.5rem;">Discount Codes</h2>
+    <p class="sub">Create a code and a % off. Set it to 100% to comp a stay entirely — no Stripe payment will be taken for that booking.</p>
+    <div id="discountMsg" style="display:none;"></div>
+    <table id="discountTable" style="margin-bottom:1rem;">
+      <thead><tr><th>Code</th><th>% off</th><th>Used</th><th>Expires</th><th>Status</th><th></th></tr></thead>
+      <tbody id="discountBody"><tr><td colspan="6" style="color:var(--muted)">Loading…</td></tr></tbody>
+    </table>
+    <div id="addDiscountForm" style="margin-bottom:2.5rem;">
+      <h3>Add a discount code</h3>
+      <div class="form-grid" style="grid-template-columns:1fr 0.7fr 0.8fr 1fr auto;">
+        <div><label>Code</label><input type="text" id="newDiscCode" placeholder="e.g. WELCOME10" style="text-transform:uppercase;"></div>
+        <div><label>% off</label><input type="number" id="newDiscPercent" min="1" max="100" value="10"></div>
+        <div><label>Max uses</label><input type="number" id="newDiscMaxUses" min="1" placeholder="Unlimited"></div>
+        <div><label>Expires</label><input type="date" id="newDiscExpires"></div>
+        <button id="addDiscBtn">Add</button>
+      </div>
+    </div>
+
+    <h2 style="margin-top:2.5rem;">Closed Dates</h2>
+    <p class="sub">Block dates for maintenance, personal use, etc. — they'll show as booked on the site and in the calendar feed sent to Airbnb/Booking.com.</p>
+    <div id="closureMsg" style="display:none;"></div>
+    <table id="closureTable" style="margin-bottom:1rem;">
+      <thead><tr><th>From</th><th>To</th><th>Note</th><th></th></tr></thead>
+      <tbody id="closureBody"><tr><td colspan="4" style="color:var(--muted)">Loading…</td></tr></tbody>
+    </table>
+    <div id="addClosureForm" style="margin-bottom:2.5rem;">
+      <h3>Close dates</h3>
+      <div class="form-grid" style="grid-template-columns:1fr 1fr 1.4fr auto;">
+        <div><label>From</label><input type="date" id="newCloseFrom"></div>
+        <div><label>To (checkout date)</label><input type="date" id="newCloseTo"></div>
+        <div><label>Note (optional)</label><input type="text" id="newCloseNote" placeholder="e.g. Boiler service"></div>
+        <button id="addCloseBtn">Close Dates</button>
+      </div>
+    </div>
+
+    <h2 style="margin-top:2.5rem;">Reports</h2>
+    <p class="sub">Nights booked, revenue and discounts given, for any date range.</p>
+    <div id="reportMsg" style="display:none;"></div>
+    <div style="background:#fff;border-radius:4px;padding:1.2rem 1.4rem;box-shadow:0 1px 4px rgba(0,0,0,0.08);margin-bottom:1.2rem;display:flex;gap:1rem;align-items:end;flex-wrap:wrap;">
+      <div>
+        <label style="display:block;font-size:0.68rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted);margin-bottom:0.3rem;">From</label>
+        <input type="date" id="reportFrom" style="border:1px solid rgba(0,0,0,0.15);border-radius:2px;padding:0.55rem 0.6rem;font-family:'DM Sans',sans-serif;font-size:0.85rem;">
+      </div>
+      <div>
+        <label style="display:block;font-size:0.68rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted);margin-bottom:0.3rem;">To</label>
+        <input type="date" id="reportTo" style="border:1px solid rgba(0,0,0,0.15);border-radius:2px;padding:0.55rem 0.6rem;font-family:'DM Sans',sans-serif;font-size:0.85rem;">
+      </div>
+      <button id="runReportBtn" style="background:var(--sage);color:var(--cream);border:none;padding:0.6rem 1.1rem;border-radius:2px;cursor:pointer;font-size:0.8rem;">Run Report</button>
+    </div>
+    <div id="reportResults" style="display:none;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:0.9rem;margin-bottom:2.5rem;">
     </div>
 
     <h2 style="margin-top:2.5rem;">Accounts</h2>
@@ -638,6 +693,182 @@
       } else showReviewsMsg('Could not add review.', false);
     });
 
+    // ─── Discount codes ──────────────────────────────────────────────
+    function showDiscountMsg(text, ok) {
+      const el = document.getElementById('discountMsg');
+      el.textContent = text;
+      el.className = 'msg-box ' + (ok ? 'ok' : 'error');
+      el.style.display = 'block';
+      setTimeout(() => { el.style.display = 'none'; }, 5000);
+    }
+
+    async function loadDiscounts() {
+      const res = await authFetch('/rest/v1/discount_codes?select=*&order=created_at.desc');
+      const tbody = document.getElementById('discountBody');
+      if (!res) return;
+      const rows = await res.json();
+      if (!Array.isArray(rows) || rows.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" style="color:var(--muted)">No discount codes yet.</td></tr>';
+        return;
+      }
+      tbody.innerHTML = rows.map(r => `
+        <tr data-id="${r.id}">
+          <td data-label="Code"><strong>${r.code}</strong></td>
+          <td data-label="% off">${r.percent_off}%</td>
+          <td data-label="Used">${r.times_used}${r.max_uses ? ' / ' + r.max_uses : ''}</td>
+          <td data-label="Expires">${r.expires_at || '—'}</td>
+          <td data-label="Status">${r.active ? 'Active' : 'Disabled'}</td>
+          <td class="row-actions">
+            <button class="disc-toggle">${r.active ? 'Disable' : 'Enable'}</button>
+            <button class="danger disc-delete">Delete</button>
+          </td>
+        </tr>`).join('');
+    }
+
+    document.getElementById('discountBody').addEventListener('click', async (e) => {
+      const tr = e.target.closest('tr');
+      if (!tr) return;
+      const id = tr.dataset.id;
+      if (e.target.classList.contains('disc-toggle')) {
+        const currentlyActive = e.target.textContent.trim() === 'Disable';
+        const res = await authFetch(`/rest/v1/discount_codes?id=eq.${id}`, { method: 'PATCH', body: JSON.stringify({ active: !currentlyActive }) });
+        if (res && res.ok) { showDiscountMsg('Updated.', true); loadDiscounts(); } else showDiscountMsg('Update failed.', false);
+      }
+      if (e.target.classList.contains('disc-delete')) {
+        if (!confirm('Delete this discount code? It will stop working immediately.')) return;
+        const res = await authFetch(`/rest/v1/discount_codes?id=eq.${id}`, { method: 'DELETE' });
+        if (res && res.ok) { tr.remove(); showDiscountMsg('Deleted.', true); } else showDiscountMsg('Delete failed.', false);
+      }
+    });
+
+    document.getElementById('addDiscBtn').addEventListener('click', async () => {
+      const code = document.getElementById('newDiscCode').value.trim().toUpperCase();
+      const percent_off = parseFloat(document.getElementById('newDiscPercent').value);
+      const maxUsesRaw = document.getElementById('newDiscMaxUses').value;
+      const expiresRaw = document.getElementById('newDiscExpires').value;
+      if (!code) { showDiscountMsg('A code is required.', false); return; }
+      if (isNaN(percent_off) || percent_off < 1 || percent_off > 100) { showDiscountMsg('% off must be between 1 and 100.', false); return; }
+      const body = {
+        code, percent_off,
+        max_uses: maxUsesRaw ? parseInt(maxUsesRaw, 10) : null,
+        expires_at: expiresRaw || null,
+      };
+      const res = await authFetch('/rest/v1/discount_codes', { method: 'POST', headers: { 'Prefer': 'return=representation' }, body: JSON.stringify(body) });
+      if (res && res.ok) {
+        showDiscountMsg('Discount code added.', true);
+        document.getElementById('newDiscCode').value = '';
+        document.getElementById('newDiscPercent').value = '10';
+        document.getElementById('newDiscMaxUses').value = '';
+        document.getElementById('newDiscExpires').value = '';
+        loadDiscounts();
+      } else showDiscountMsg('Could not add — that code may already exist.', false);
+    });
+
+    // ─── Closed dates ─────────────────────────────────────────────────
+    function showClosureMsg(text, ok) {
+      const el = document.getElementById('closureMsg');
+      el.textContent = text;
+      el.className = 'msg-box ' + (ok ? 'ok' : 'error');
+      el.style.display = 'block';
+      setTimeout(() => { el.style.display = 'none'; }, 5000);
+    }
+
+    async function loadClosures() {
+      const res = await authFetch('/rest/v1/bookings?select=id,checkin,checkout,message&is_blocked=eq.true&status=eq.confirmed&order=checkin.asc');
+      const tbody = document.getElementById('closureBody');
+      if (!res) return;
+      const rows = await res.json();
+      if (!Array.isArray(rows) || rows.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" style="color:var(--muted)">No closed dates.</td></tr>';
+        return;
+      }
+      tbody.innerHTML = rows.map(r => `
+        <tr data-id="${r.id}">
+          <td data-label="From">${r.checkin}</td>
+          <td data-label="To">${r.checkout}</td>
+          <td data-label="Note">${r.message || '—'}</td>
+          <td class="row-actions"><button class="reopen-btn">Reopen</button></td>
+        </tr>`).join('');
+    }
+
+    document.getElementById('closureBody').addEventListener('click', async (e) => {
+      if (!e.target.classList.contains('reopen-btn')) return;
+      const tr = e.target.closest('tr');
+      if (!confirm('Reopen these dates? They will become bookable again.')) return;
+      const res = await authFetch(`/rest/v1/bookings?id=eq.${tr.dataset.id}`, { method: 'PATCH', body: JSON.stringify({ status: 'cancelled' }) });
+      if (res && res.ok) { tr.remove(); showClosureMsg('Dates reopened.', true); syncCalendarAvailabilityQuiet(); } else showClosureMsg('Could not reopen.', false);
+    });
+
+    document.getElementById('addCloseBtn').addEventListener('click', async () => {
+      const date_from = document.getElementById('newCloseFrom').value;
+      const date_to = document.getElementById('newCloseTo').value;
+      const note = document.getElementById('newCloseNote').value.trim();
+      if (!date_from || !date_to || date_to <= date_from) { showClosureMsg('Pick a valid from/to range (to must be after from).', false); return; }
+      const body = {
+        checkin: date_from, checkout: date_to,
+        source: 'direct', status: 'confirmed', is_blocked: true,
+        deposit_paid: true, amount_paid: 0, total_amount: 0,
+        message: note || null,
+      };
+      const res = await authFetch('/rest/v1/bookings', { method: 'POST', headers: { 'Prefer': 'return=representation' }, body: JSON.stringify(body) });
+      if (res && res.ok) {
+        showClosureMsg('Dates closed.', true);
+        document.getElementById('newCloseFrom').value = '';
+        document.getElementById('newCloseTo').value = '';
+        document.getElementById('newCloseNote').value = '';
+        loadClosures();
+      } else showClosureMsg('Could not close those dates — check they don\'t overlap an existing booking.', false);
+    });
+
+    function syncCalendarAvailabilityQuiet() { /* no-op placeholder — availability is read fresh by the site on each visit */ }
+
+    // ─── Reports ────────────────────────────────────────────────────
+    function showReportMsg(text, ok) {
+      const el = document.getElementById('reportMsg');
+      el.textContent = text;
+      el.className = 'msg-box ' + (ok ? 'ok' : 'error');
+      el.style.display = 'block';
+      setTimeout(() => { el.style.display = 'none'; }, 5000);
+    }
+
+    function money(n) { return '£' + Number(n || 0).toFixed(2).replace(/\.00$/, ''); }
+
+    const METRIC_LABELS = [
+      ['total_nights_all_sources', 'Total nights booked'],
+      ['direct_nights', 'Direct nights'],
+      ['airbnb_nights', 'Airbnb nights'],
+      ['booking_com_nights', 'Booking.com nights'],
+      ['direct_bookings_count', 'Direct bookings'],
+      ['total_revenue', 'Direct revenue (paid)', true],
+      ['total_discount_given', 'Discounts given', true],
+      ['blocked_nights', 'Closed nights'],
+    ];
+
+    document.getElementById('runReportBtn').addEventListener('click', async () => {
+      const date_from = document.getElementById('reportFrom').value;
+      const date_to = document.getElementById('reportTo').value;
+      if (!date_from || !date_to) { showReportMsg('Pick a from and to date.', false); return; }
+      const res = await authFetch('/rest/v1/rpc/get_booking_stats', { method: 'POST', body: JSON.stringify({ date_from, date_to }) });
+      const rows = res ? await res.json() : null;
+      if (!res || !res.ok || !Array.isArray(rows) || !rows[0]) { showReportMsg('Could not run report.', false); return; }
+      const stats = rows[0];
+      const wrap = document.getElementById('reportResults');
+      wrap.style.display = 'grid';
+      wrap.innerHTML = METRIC_LABELS.map(([key, label, isMoney]) => `
+        <div class="metric-card">
+          <div class="metric-label">${label}</div>
+          <div class="metric-value">${isMoney ? money(stats[key]) : (stats[key] ?? 0)}</div>
+        </div>`).join('');
+    });
+
+    (function setDefaultReportRange() {
+      const now = new Date();
+      document.getElementById('reportFrom').value = `${now.getFullYear()}-01-01`;
+      document.getElementById('reportTo').value = `${now.getFullYear()}-12-31`;
+    })();
+
+    loadDiscounts();
+    loadClosures();
     loadReviewsAdmin();
     loadFireChecks();
     loadRates();
