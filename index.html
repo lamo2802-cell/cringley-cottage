@@ -1215,7 +1215,7 @@
           <p id="bpDiscountMsg" style="font-size:0.78rem;margin-top:0.4rem;display:none;"></p>
         </div>
         <div id="bpHoldBanner" style="display:none;background:rgba(94,122,82,0.18);border:1px solid rgba(94,122,82,0.35);border-radius:2px;padding:0.6rem 0.9rem;margin-bottom:1rem;font-size:0.78rem;color:rgba(247,242,234,0.85);">
-          Dates held for <strong id="bpHoldTimerText">30:00</strong>
+          Dates held for <strong id="bpHoldTimerText">10:00</strong>
         </div>
         <form id="bpEnquiryForm">
           <p style="font-size:0.75rem;text-transform:uppercase;letter-spacing:0.08em;color:rgba(247,242,234,0.5);margin-bottom:0.6rem;">Lead guest</p>
@@ -1510,6 +1510,9 @@
   let selStart  = null;
   let selEnd    = null;
 
+  // No single stay can run longer than this many nights (28 = 4 weeks).
+  const MAX_STAY_NIGHTS = 28;
+
   // Owner-configurable in admin.html — Booking Settings
   let MIN_ADVANCE_NIGHTS = 2;
   let FULL_PAYMENT_WINDOW_DAYS = 14;
@@ -1617,9 +1620,10 @@
         } else {
           const crossesBlocked = nights > 0 && rangeHasBlockedDates(sDateForMin, thisDate);
           const belowMin = nights > 0 && nights < minNightsRequired;
-          if (nights > 0 && (belowMin || crossesBlocked)) {
+          const aboveMax = nights > MAX_STAY_NIGHTS;
+          if (nights > 0 && (belowMin || crossesBlocked || aboveMax)) {
             el.classList.add('below-min');
-            el.title = belowMin ? `Minimum stay for these dates is ${minNightsRequired} nights` : 'Includes unavailable dates';
+            el.title = aboveMax ? `The longest single stay is ${MAX_STAY_NIGHTS} nights` : (belowMin ? `Minimum stay for these dates is ${minNightsRequired} nights` : 'Includes unavailable dates');
             anyBelowMin = true;
           } else {
             el.classList.add('available');
@@ -1698,7 +1702,7 @@
 
     // The calendar (and its "Clear dates" button) stays visible on top of
     // Step 2, so a guest can clear their dates without clicking Back first.
-    // If a 30-min hold is active on those dates, clearing them must release
+    // If a 10-min hold is active on those dates, clearing them must release
     // it — otherwise the dates stay blocked for everyone, including the
     // guest who just cleared them, until the hold expires on its own.
     if (typeof activeHold !== 'undefined' && activeHold) {
@@ -1771,6 +1775,10 @@
           showToast(`Minimum stay for these dates is ${minN} nights — please choose a later checkout.`);
           return;
         }
+        if (nights > MAX_STAY_NIGHTS) {
+          showToast(`The longest single stay is ${MAX_STAY_NIGHTS} nights — please choose an earlier checkout.`);
+          return;
+        }
         // Check range doesn't cross blocked dates
         if (rangeHasBlockedDates(sDate, clicked)) {
           showToast('Your selected range includes unavailable dates — please choose different dates.');
@@ -1819,6 +1827,11 @@
     const summary = document.getElementById('bpSummary');
     if (nights < minN) {
       summary.innerHTML = `<div class="bp-line" style="color:var(--sage-light)"><span>Minimum stay for these dates is ${minN} nights</span></div>`;
+      setBpSubmitEnabled(false);
+      return;
+    }
+    if (nights > MAX_STAY_NIGHTS) {
+      summary.innerHTML = `<div class="bp-line" style="color:var(--sage-light)"><span>The longest single stay is ${MAX_STAY_NIGHTS} nights</span></div>`;
       setBpSubmitEnabled(false);
       return;
     }
@@ -1981,13 +1994,13 @@
   }
 
   // Release the hold early if the visitor closes the tab / navigates away
-  // before submitting — no need to make anyone else wait the full 30 minutes.
+  // before submitting — no need to make anyone else wait the full 10 minutes.
   window.addEventListener('pagehide', () => {
     if (!activeHold) return;
     try {
       const blob = new Blob([JSON.stringify({ hold_id: activeHold.id })], { type: 'text/plain;charset=UTF-8' });
       navigator.sendBeacon(`${SUPABASE_URL}/functions/v1/release-hold`, blob);
-    } catch (e) { /* best-effort — the 30-min expiry and cleanup job are the fallback */ }
+    } catch (e) { /* best-effort — the 10-min expiry and cleanup job are the fallback */ }
   });
 
   const MAX_OCCUPANCY = 4;
@@ -2030,7 +2043,7 @@
     document.getElementById('bpStep1').style.display = 'none';
     document.getElementById('bpStep2').style.display = 'block';
 
-    // This is the "progress to book now" moment — create the 30-min hold.
+    // This is the "progress to book now" moment — create the 10-min hold.
     try {
       const res = await fetch(`${SUPABASE_URL}/functions/v1/create-hold`, {
         method: 'POST',
