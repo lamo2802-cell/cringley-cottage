@@ -79,6 +79,11 @@
     tr { margin-bottom: 1rem; border: 1px solid rgba(0,0,0,0.08); border-radius: 4px; padding: 0.6rem; }
     td { border: none; padding: 0.35rem 0; }
     td::before { content: attr(data-label); display: block; font-size: 0.65rem; text-transform: uppercase; color: var(--muted); margin-bottom: 0.15rem; }
+    /* Some mobile browsers keep honoring a <col>'s inline width as a sizing
+       hint even after the table collapses to this stacked block layout,
+       leaving each field squeezed into a narrow strip with a large empty
+       gap beside it. Column widths are a desktop-only concern. */
+    col { width: auto !important; }
   }
   #msg, .msg-box { display: none; padding: 0.7rem 1rem; border-radius: 2px; font-size: 0.85rem; margin-bottom: 1rem; }
   #msg.ok, .msg-box.ok { background: rgba(94,122,82,0.12); border: 1px solid rgba(94,122,82,0.3); color: #3d5233; }
