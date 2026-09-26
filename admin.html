@@ -4,6 +4,21 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Manage Prices — Cringley Cottage</title>
+<script>
+  // Runs synchronously before anything below is parsed or painted, so a
+  // signed-out (or staff) visitor is sent onward before the admin markup
+  // ever becomes visible — previously this check ran in a script near the
+  // bottom of the page, so the page flashed on screen first.
+  (function () {
+    var session = null;
+    try { session = JSON.parse(localStorage.getItem('cc_session')); } catch (e) {}
+    if (!session || !session.access_token) {
+      window.location.replace('login.html');
+    } else if (session.role !== 'owner') {
+      window.location.replace('staff-checklist.html');
+    }
+  })();
+</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
 <style>
