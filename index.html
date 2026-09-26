@@ -1692,7 +1692,7 @@
     clearBtn.style.display = selStart ? 'inline' : 'none';
   }
 
-  function clearDateSelection() {
+  async function clearDateSelection() {
     selStart = null; selEnd = null;
     buildCal();
     updateSelectionReadout();
@@ -1706,15 +1706,12 @@
     // it — otherwise the dates stay blocked for everyone, including the
     // guest who just cleared them, until the hold expires on its own.
     if (typeof activeHold !== 'undefined' && activeHold) {
-      try {
-        navigator.sendBeacon(`${SUPABASE_URL}/functions/v1/release-hold`, new Blob([JSON.stringify({ hold_id: activeHold.id })], { type: 'text/plain;charset=UTF-8' }));
-      } catch (e) {}
+      const holdId = activeHold.id;
       activeHold = null;
       if (typeof holdTimerInterval !== 'undefined' && holdTimerInterval) clearInterval(holdTimerInterval);
       const banner = document.getElementById('bpHoldBanner');
       if (banner) banner.style.display = 'none';
       if (typeof resetDiscountUI === 'function') resetDiscountUI();
-      syncCalendar();
 
       const step2 = document.getElementById('bpStep2');
       const step1 = document.getElementById('bpStep1');
@@ -1722,6 +1719,19 @@
         step2.style.display = 'none';
         step1.style.display = 'block';
       }
+
+      // Wait for the release to actually land server-side before refreshing
+      // the calendar — a fire-and-forget beacon can still be in flight when
+      // syncCalendar() re-fetches availability, so the just-released dates
+      // would come back as blocked until a later manual refresh.
+      try {
+        await fetch(`${SUPABASE_URL}/functions/v1/release-hold`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ hold_id: holdId }),
+        });
+      } catch (e) {}
+      syncCalendar();
     }
   }
   document.getElementById('calClearBtn').addEventListener('click', clearDateSelection);
@@ -2063,16 +2073,24 @@
     } catch (e) { /* if this fails, the final submit still does its own clash check */ }
   });
 
-  document.getElementById('bpBack').addEventListener('click', () => {
+  document.getElementById('bpBack').addEventListener('click', async () => {
     document.getElementById('bpStep2').style.display = 'none';
     document.getElementById('bpStep1').style.display = 'block';
     resetDiscountUI();
     if (activeHold) {
-      try {
-        navigator.sendBeacon(`${SUPABASE_URL}/functions/v1/release-hold`, new Blob([JSON.stringify({ hold_id: activeHold.id })], { type: 'text/plain;charset=UTF-8' }));
-      } catch (e) {}
+      const holdId = activeHold.id;
       activeHold = null;
       if (holdTimerInterval) clearInterval(holdTimerInterval);
+      // Wait for the release to land server-side before refreshing the
+      // calendar — otherwise syncCalendar() can win the race against the
+      // release request and re-show these dates as still held.
+      try {
+        await fetch(`${SUPABASE_URL}/functions/v1/release-hold`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ hold_id: holdId }),
+        });
+      } catch (e) {}
       syncCalendar();
     }
   });
