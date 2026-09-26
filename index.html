@@ -1263,7 +1263,7 @@
           </div>
 
 
-          <label for="bpHasDog" style="margin:1rem 0 0.75rem;display:flex;align-items:center;gap:0.7rem;background:rgba(247,242,234,0.05);border:1px solid rgba(247,242,234,0.12);border-radius:2px;padding:0.75rem 0.9rem;cursor:pointer;">
+          <label for="bpHasDog" style="margin:1rem 0 0.75rem;display:flex;align-items:center;gap:0.7rem;background:rgba(247,242,234,0.05);border:1px solid rgba(247,242,234,0.12);border-radius:2px;padding:0.75rem 0.9rem;cursor:pointer;color:var(--cream);">
             <input type="checkbox" id="bpHasDog" style="width:20px;height:20px;flex-shrink:0;accent-color:var(--sage);cursor:pointer;">
             <span id="bpHasDogLabel">Bringing a dog?</span>
           </label>
@@ -1273,7 +1273,7 @@
             <textarea id="bpMessage" rows="3" placeholder="Special requirements, questions..." style="background:rgba(247,242,234,0.07);border:1px solid rgba(247,242,234,0.12);color:var(--cream);padding:0.65rem 0.85rem;font-family:'DM Sans',sans-serif;font-size:0.85rem;border-radius:2px;width:100%;resize:vertical;outline:none;transition:border-color 0.2s;"></textarea>
           </div>
 
-          <label for="bpMarketingConsent" style="margin:0 0 1rem;display:flex;align-items:flex-start;gap:0.7rem;background:rgba(247,242,234,0.05);border:1px solid rgba(247,242,234,0.12);border-radius:2px;padding:0.75rem 0.9rem;cursor:pointer;">
+          <label for="bpMarketingConsent" style="margin:0 0 1rem;display:flex;align-items:flex-start;gap:0.7rem;background:rgba(247,242,234,0.05);border:1px solid rgba(247,242,234,0.12);border-radius:2px;padding:0.75rem 0.9rem;cursor:pointer;color:var(--cream);">
             <input type="checkbox" id="bpMarketingConsent" style="width:20px;height:20px;flex-shrink:0;margin-top:0.1rem;accent-color:var(--sage);cursor:pointer;">
             <span style="font-size:0.82rem;line-height:1.5;">I'd like to receive occasional offers and updates from Cringley Cottage by email. (Optional — you can unsubscribe any time.)</span>
           </label>
@@ -1695,6 +1695,30 @@
     document.getElementById('bpCheckin').value = '';
     document.getElementById('bpCheckout').value = '';
     setBpSubmitEnabled(false);
+
+    // The calendar (and its "Clear dates" button) stays visible on top of
+    // Step 2, so a guest can clear their dates without clicking Back first.
+    // If a 30-min hold is active on those dates, clearing them must release
+    // it — otherwise the dates stay blocked for everyone, including the
+    // guest who just cleared them, until the hold expires on its own.
+    if (typeof activeHold !== 'undefined' && activeHold) {
+      try {
+        navigator.sendBeacon(`${SUPABASE_URL}/functions/v1/release-hold`, new Blob([JSON.stringify({ hold_id: activeHold.id })], { type: 'text/plain;charset=UTF-8' }));
+      } catch (e) {}
+      activeHold = null;
+      if (typeof holdTimerInterval !== 'undefined' && holdTimerInterval) clearInterval(holdTimerInterval);
+      const banner = document.getElementById('bpHoldBanner');
+      if (banner) banner.style.display = 'none';
+      if (typeof resetDiscountUI === 'function') resetDiscountUI();
+      syncCalendar();
+
+      const step2 = document.getElementById('bpStep2');
+      const step1 = document.getElementById('bpStep1');
+      if (step2 && step1 && step2.style.display !== 'none') {
+        step2.style.display = 'none';
+        step1.style.display = 'block';
+      }
+    }
   }
   document.getElementById('calClearBtn').addEventListener('click', clearDateSelection);
 
