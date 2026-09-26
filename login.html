@@ -55,6 +55,20 @@
       <input type="password" id="password" required autocomplete="current-password">
       <button type="submit" id="submitBtn">Sign In</button>
     </form>
+    <form id="mfaForm" style="display:none;">
+      <p class="sub" style="margin-bottom:1.4rem;">Enter the 6-digit code from your authenticator app.</p>
+      <label>Verification code</label>
+      <input type="text" id="mfaCode" inputmode="numeric" autocomplete="one-time-code" maxlength="6">
+      <button type="submit" id="mfaSubmitBtn">Verify</button>
+      <a href="#" id="useBackupLink" class="back" style="margin-top:1rem;">Use a backup code instead</a>
+    </form>
+    <form id="backupForm" style="display:none;">
+      <p class="sub" style="margin-bottom:1.4rem;">Enter one of your one-time backup codes.</p>
+      <label>Backup code</label>
+      <input type="text" id="backupCode" autocomplete="off" placeholder="XXXX-XXXX">
+      <button type="submit" id="backupSubmitBtn">Verify</button>
+      <a href="#" id="useCodeLink" class="back" style="margin-top:1rem;">Use my authenticator app instead</a>
+    </form>
     <a href="index.html" class="back">&#8592; Back to site</a>
   </div>
 
@@ -73,11 +87,30 @@
       }
     })();
 
+    // Holds the aal1 (password-only) session while a second factor is
+    // pending, and the totp factor id once we know it. Never written to
+    // localStorage until the second step (or the "no 2FA enrolled") passes.
+    let pending = null;
+
+    function showErr(text) {
+      const errBox = document.getElementById('err');
+      errBox.textContent = text;
+      errBox.style.display = 'block';
+    }
+
+    function finishLogin(access_token, refresh_token, expires_in, role, user_id) {
+      localStorage.setItem('cc_session', JSON.stringify({
+        access_token, refresh_token,
+        expires_at: Date.now() + (expires_in * 1000),
+        role, user_id,
+      }));
+      window.location.href = role === 'owner' ? 'admin.html' : 'staff-checklist.html';
+    }
+
     document.getElementById('loginForm').addEventListener('submit', async (e) => {
       e.preventDefault();
       const btn = document.getElementById('submitBtn');
-      const errBox = document.getElementById('err');
-      errBox.style.display = 'none';
+      document.getElementById('err').style.display = 'none';
       btn.disabled = true; btn.textContent = 'Signing in…';
 
       try {
@@ -91,25 +124,91 @@
         });
         const data = await res.json();
         if (!res.ok) {
-          errBox.textContent = data.error_description || data.msg || 'Sign in failed — check your email and password.';
-          errBox.style.display = 'block';
+          showErr(data.error_description || data.msg || 'Sign in failed — check your email and password.');
           btn.disabled = false; btn.textContent = 'Sign In';
           return;
         }
         const role = data.user?.app_metadata?.role || null;
-        localStorage.setItem('cc_session', JSON.stringify({
-          access_token: data.access_token,
-          refresh_token: data.refresh_token,
-          expires_at: Date.now() + (data.expires_in * 1000),
-          role,
-          user_id: data.user?.id || null,
-        }));
-        window.location.href = role === 'owner' ? 'admin.html' : 'staff-checklist.html';
+        const verifiedFactor = (data.user?.factors || []).find(f => f.factor_type === 'totp' && f.status === 'verified');
+
+        if (!verifiedFactor) {
+          finishLogin(data.access_token, data.refresh_token, data.expires_in, role, data.user?.id || null);
+          return;
+        }
+
+        // 2FA is enrolled on this account — hold the aal1 session and ask
+        // for a second factor before granting access.
+        pending = { access_token: data.access_token, refresh_token: data.refresh_token, expires_in: data.expires_in, role, user_id: data.user?.id || null, factorId: verifiedFactor.id };
+        document.getElementById('loginForm').style.display = 'none';
+        document.getElementById('mfaForm').style.display = 'block';
+        document.getElementById('mfaCode').focus();
       } catch (e) {
-        errBox.textContent = 'Something went wrong — please try again.';
-        errBox.style.display = 'block';
+        showErr('Something went wrong — please try again.');
         btn.disabled = false; btn.textContent = 'Sign In';
       }
+    });
+
+    document.getElementById('mfaForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const btn = document.getElementById('mfaSubmitBtn');
+      document.getElementById('err').style.display = 'none';
+      btn.disabled = true; btn.textContent = 'Verifying…';
+      try {
+        const challengeRes = await fetch(`${SUPABASE_URL}/auth/v1/factors/${pending.factorId}/challenge`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${pending.access_token}` },
+        });
+        const challenge = await challengeRes.json();
+        if (!challengeRes.ok) { showErr(challenge.error_description || challenge.msg || 'Could not start verification.'); btn.disabled = false; btn.textContent = 'Verify'; return; }
+
+        const verifyRes = await fetch(`${SUPABASE_URL}/auth/v1/factors/${pending.factorId}/verify`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${pending.access_token}` },
+          body: JSON.stringify({ challenge_id: challenge.id, code: document.getElementById('mfaCode').value.trim() }),
+        });
+        const verify = await verifyRes.json();
+        if (!verifyRes.ok) { showErr(verify.error_description || verify.msg || 'Incorrect code — please try again.'); btn.disabled = false; btn.textContent = 'Verify'; document.getElementById('mfaCode').value = ''; document.getElementById('mfaCode').focus(); return; }
+
+        finishLogin(verify.access_token, verify.refresh_token, verify.expires_in, pending.role, pending.user_id);
+      } catch (e) {
+        showErr('Something went wrong — please try again.');
+        btn.disabled = false; btn.textContent = 'Verify';
+      }
+    });
+
+    document.getElementById('backupForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const btn = document.getElementById('backupSubmitBtn');
+      document.getElementById('err').style.display = 'none';
+      btn.disabled = true; btn.textContent = 'Verifying…';
+      try {
+        const res = await fetch(`${SUPABASE_URL}/functions/v1/mfa-verify-backup-code`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${pending.access_token}` },
+          body: JSON.stringify({ code: document.getElementById('backupCode').value.trim() }),
+        });
+        const data = await res.json();
+        if (!data.ok) { showErr(data.error || 'Invalid backup code.'); btn.disabled = false; btn.textContent = 'Verify'; return; }
+        finishLogin(pending.access_token, pending.refresh_token, pending.expires_in, pending.role, pending.user_id);
+      } catch (e) {
+        showErr('Something went wrong — please try again.');
+        btn.disabled = false; btn.textContent = 'Verify';
+      }
+    });
+
+    document.getElementById('useBackupLink').addEventListener('click', (e) => {
+      e.preventDefault();
+      document.getElementById('mfaForm').style.display = 'none';
+      document.getElementById('backupForm').style.display = 'block';
+      document.getElementById('err').style.display = 'none';
+      document.getElementById('backupCode').focus();
+    });
+    document.getElementById('useCodeLink').addEventListener('click', (e) => {
+      e.preventDefault();
+      document.getElementById('backupForm').style.display = 'none';
+      document.getElementById('mfaForm').style.display = 'block';
+      document.getElementById('err').style.display = 'none';
+      document.getElementById('mfaCode').focus();
     });
   </script>
 </body>

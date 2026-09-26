@@ -505,6 +505,36 @@
       </div>
     </div>
 
+    <h2 style="margin-top:2.5rem;">Two-Factor Authentication</h2>
+    <p class="sub">Adds a second step to your own login — an authenticator app code, on top of your password. Each owner sets this up for their own account.</p>
+    <div id="mfaMsg" style="display:none;"></div>
+    <div id="mfaStatusBox" style="background:#fff;border-radius:4px;padding:1.4rem;box-shadow:0 1px 4px rgba(0,0,0,0.08);">
+      <p id="mfaStatusText" style="color:var(--muted);">Checking status…</p>
+      <div style="display:flex;gap:0.7rem;flex-wrap:wrap;margin-top:1rem;">
+        <button id="mfaEnableBtn" style="display:none;background:var(--sage);color:var(--cream);border:none;padding:0.6rem 1.1rem;border-radius:2px;cursor:pointer;font-size:0.8rem;">Enable 2FA</button>
+        <button id="mfaRegenBtn" style="display:none;background:none;border:1px solid rgba(0,0,0,0.2);color:var(--ink);padding:0.6rem 1.1rem;border-radius:2px;cursor:pointer;font-size:0.8rem;">Regenerate backup codes</button>
+        <button id="mfaDisableBtn" style="display:none;background:none;border:1px solid rgba(180,80,60,0.4);color:#b4503c;padding:0.6rem 1.1rem;border-radius:2px;cursor:pointer;font-size:0.8rem;">Disable 2FA</button>
+      </div>
+
+      <div id="mfaEnrollBox" style="display:none;margin-top:1.4rem;padding-top:1.4rem;border-top:1px solid rgba(0,0,0,0.08);">
+        <p style="font-size:0.85rem;margin-bottom:0.8rem;">Scan this with your authenticator app (Google Authenticator, Authy, 1Password, etc.):</p>
+        <div id="mfaQrBox" style="margin-bottom:0.8rem;"></div>
+        <p style="font-size:0.75rem;color:var(--muted);margin-bottom:1rem;">Can't scan it? Enter this key manually: <code id="mfaSecretText" style="user-select:all;"></code></p>
+        <div style="max-width:220px;">
+          <label style="display:block;font-size:0.68rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted);margin-bottom:0.3rem;">6-digit code</label>
+          <input type="text" id="mfaEnrollCode" inputmode="numeric" maxlength="6" style="width:100%;border:1px solid rgba(0,0,0,0.15);border-radius:2px;padding:0.55rem 0.6rem;font-family:'DM Sans',sans-serif;font-size:0.85rem;margin-bottom:0.8rem;">
+        </div>
+        <button id="mfaVerifyEnrollBtn" style="background:var(--sage);color:var(--cream);border:none;padding:0.6rem 1.1rem;border-radius:2px;cursor:pointer;font-size:0.8rem;">Verify &amp; enable</button>
+        <button id="mfaCancelEnrollBtn" style="background:none;border:1px solid rgba(0,0,0,0.2);color:var(--ink);padding:0.6rem 1.1rem;border-radius:2px;cursor:pointer;font-size:0.8rem;">Cancel</button>
+      </div>
+
+      <div id="mfaCodesBox" style="display:none;margin-top:1.4rem;padding-top:1.4rem;border-top:1px solid rgba(0,0,0,0.08);">
+        <p style="font-size:0.85rem;margin-bottom:0.6rem;"><strong>Save these backup codes now</strong> — they're shown only this once. Each one lets you sign in a single time if you lose your authenticator device.</p>
+        <div id="mfaCodesList" style="font-family:monospace;font-size:0.95rem;line-height:1.9;background:rgba(94,122,82,0.08);border-radius:2px;padding:0.9rem 1.1rem;margin-bottom:1rem;"></div>
+        <button id="mfaCodesAckBtn" style="background:var(--sage);color:var(--cream);border:none;padding:0.6rem 1.1rem;border-radius:2px;cursor:pointer;font-size:0.8rem;">I've saved these codes</button>
+      </div>
+    </div>
+
     <h2 style="margin-top:2.5rem;">Fire Safety Checks</h2>
     <p class="sub">Submitted by staff at each changeover — records kept as proof of compliance.</p>
     <div id="fireLoading" style="padding:1rem 0;color:var(--muted);">Loading…</div>
@@ -837,6 +867,132 @@
       if (data.ok) showStaffMsg('Password reset. Give the new password to them directly.', true);
       else showStaffMsg(data.error || 'Reset failed.', false);
     });
+
+    // ─── Two-factor authentication (own account) ─────────────────────
+    function showMfaMsg(text, ok) {
+      const el = document.getElementById('mfaMsg');
+      el.textContent = text;
+      el.className = 'msg-box ' + (ok ? 'ok' : 'error');
+      el.style.display = 'block';
+      setTimeout(() => { el.style.display = 'none'; }, 6000);
+    }
+
+    let mfaFactorId = null; // the currently-verified factor, once known
+
+    async function loadMfaStatus() {
+      document.getElementById('mfaEnrollBox').style.display = 'none';
+      document.getElementById('mfaCodesBox').style.display = 'none';
+      const res = await authFetch('/auth/v1/user');
+      if (!res) return;
+      const data = await res.json();
+      const verified = (data.factors || []).find(f => f.factor_type === 'totp' && f.status === 'verified');
+      mfaFactorId = verified ? verified.id : null;
+      const statusText = document.getElementById('mfaStatusText');
+      const enableBtn = document.getElementById('mfaEnableBtn');
+      const regenBtn = document.getElementById('mfaRegenBtn');
+      const disableBtn = document.getElementById('mfaDisableBtn');
+      if (verified) {
+        statusText.textContent = 'Enabled — you’ll be asked for a code from your authenticator app each time you sign in.';
+        statusText.style.color = 'var(--sage)';
+        enableBtn.style.display = 'none';
+        regenBtn.style.display = 'inline-block';
+        disableBtn.style.display = 'inline-block';
+      } else {
+        statusText.textContent = 'Not enabled on your account.';
+        statusText.style.color = 'var(--muted)';
+        enableBtn.style.display = 'inline-block';
+        regenBtn.style.display = 'none';
+        disableBtn.style.display = 'none';
+      }
+    }
+
+    let pendingEnrollFactorId = null;
+
+    document.getElementById('mfaEnableBtn').addEventListener('click', async () => {
+      // Clean up any half-finished enrollment from a previous attempt first.
+      const userRes = await authFetch('/auth/v1/user');
+      const userData = userRes ? await userRes.json() : {};
+      const stale = (userData.factors || []).filter(f => f.factor_type === 'totp' && f.status !== 'verified');
+      for (const f of stale) {
+        await authFetch(`/auth/v1/factors/${f.id}`, { method: 'DELETE' });
+      }
+
+      const res = await authFetch('/auth/v1/factors', { method: 'POST', body: JSON.stringify({ factor_type: 'totp', friendly_name: `Cringley Cottage ${Date.now()}` }) });
+      const data = res ? await res.json() : null;
+      if (!data || !data.id) { showMfaMsg((data && (data.error_description || data.msg)) || 'Could not start setup.', false); return; }
+      pendingEnrollFactorId = data.id;
+      const qr = data.totp?.qr_code || '';
+      document.getElementById('mfaQrBox').innerHTML = qr.trim().startsWith('<svg') ? qr : `<img src="${qr}" alt="QR code" style="max-width:220px;">`;
+      document.getElementById('mfaSecretText').textContent = data.totp?.secret || '';
+      document.getElementById('mfaEnrollCode').value = '';
+      document.getElementById('mfaEnrollBox').style.display = 'block';
+      document.getElementById('mfaEnrollCode').focus();
+    });
+
+    document.getElementById('mfaCancelEnrollBtn').addEventListener('click', async () => {
+      if (pendingEnrollFactorId) await authFetch(`/auth/v1/factors/${pendingEnrollFactorId}`, { method: 'DELETE' });
+      pendingEnrollFactorId = null;
+      document.getElementById('mfaEnrollBox').style.display = 'none';
+    });
+
+    document.getElementById('mfaVerifyEnrollBtn').addEventListener('click', async () => {
+      const code = document.getElementById('mfaEnrollCode').value.trim();
+      if (!code) return;
+      const btn = document.getElementById('mfaVerifyEnrollBtn');
+      btn.disabled = true; btn.textContent = 'Verifying…';
+
+      const challengeRes = await authFetch(`/auth/v1/factors/${pendingEnrollFactorId}/challenge`, { method: 'POST' });
+      const challenge = challengeRes ? await challengeRes.json() : null;
+      if (!challenge || !challenge.id) { showMfaMsg('Could not verify — please try again.', false); btn.disabled = false; btn.textContent = 'Verify & enable'; return; }
+
+      const verifyRes = await authFetch(`/auth/v1/factors/${pendingEnrollFactorId}/verify`, { method: 'POST', body: JSON.stringify({ challenge_id: challenge.id, code }) });
+      const verify = verifyRes ? await verifyRes.json() : null;
+      btn.disabled = false; btn.textContent = 'Verify & enable';
+      if (!verify || !verify.access_token) { showMfaMsg((verify && (verify.error_description || verify.msg)) || 'Incorrect code — please try again.', false); return; }
+
+      // Refresh our stored session to the new (aal2) tokens.
+      session.access_token = verify.access_token;
+      session.refresh_token = verify.refresh_token;
+      session.expires_at = Date.now() + verify.expires_in * 1000;
+      localStorage.setItem('cc_session', JSON.stringify(session));
+
+      document.getElementById('mfaEnrollBox').style.display = 'none';
+      showMfaMsg('2FA enabled.', true);
+
+      const codesRes = await authFetch('/functions/v1/mfa-generate-backup-codes', { method: 'POST' });
+      const codesData = codesRes ? await codesRes.json() : null;
+      if (codesData && codesData.ok) {
+        document.getElementById('mfaCodesList').innerHTML = codesData.codes.map(c => escapeHtml(c)).join('<br>');
+        document.getElementById('mfaCodesBox').style.display = 'block';
+      }
+      loadMfaStatus();
+    });
+
+    document.getElementById('mfaCodesAckBtn').addEventListener('click', () => {
+      document.getElementById('mfaCodesBox').style.display = 'none';
+    });
+
+    document.getElementById('mfaRegenBtn').addEventListener('click', async () => {
+      if (!confirm('Generate a new set of backup codes? Your old codes will stop working.')) return;
+      const res = await authFetch('/functions/v1/mfa-generate-backup-codes', { method: 'POST' });
+      const data = res ? await res.json() : null;
+      if (data && data.ok) {
+        document.getElementById('mfaCodesList').innerHTML = data.codes.map(c => escapeHtml(c)).join('<br>');
+        document.getElementById('mfaCodesBox').style.display = 'block';
+      } else {
+        showMfaMsg('Could not generate new codes.', false);
+      }
+    });
+
+    document.getElementById('mfaDisableBtn').addEventListener('click', async () => {
+      if (!mfaFactorId) return;
+      if (!confirm('Disable 2FA on your account? You will only need your password to sign in.')) return;
+      const res = await authFetch(`/auth/v1/factors/${mfaFactorId}`, { method: 'DELETE' });
+      if (res && res.ok) { showMfaMsg('2FA disabled.', true); loadMfaStatus(); }
+      else showMfaMsg('Could not disable 2FA.', false);
+    });
+
+    loadMfaStatus();
 
     document.getElementById('addStaffBtn').addEventListener('click', async () => {
       const email = document.getElementById('staffEmail').value.trim();
