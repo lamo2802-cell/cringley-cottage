@@ -95,6 +95,89 @@
   .metric-card { background: #fff; border-radius: 4px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); padding: 1rem 1.2rem; }
   .metric-card .metric-label { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); margin-bottom: 0.4rem; }
   .metric-card .metric-value { font-family: 'Cormorant Garamond', serif; font-weight: 600; font-size: 1.6rem; color: var(--ink); }
+
+  /* ─── Calendar ───────────────────────────────────────────────── */
+  .next-booking-banner {
+    background: var(--ink); color: var(--cream); border-radius: 4px; padding: 1rem 1.3rem;
+    margin-bottom: 1.4rem; display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap;
+  }
+  .next-booking-banner .nbb-label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.06em; color: rgba(247,242,234,0.6); margin-bottom: 0.2rem; }
+  .next-booking-banner .nbb-main { font-family: 'Cormorant Garamond', serif; font-size: 1.25rem; }
+  .next-booking-banner.empty { background: rgba(94,122,82,0.1); color: var(--ink); }
+  .next-booking-banner.empty .nbb-label { color: var(--muted); }
+  .cal-nav { display: flex; align-items: center; justify-content: center; gap: 1.2rem; margin-bottom: 0.9rem; }
+  .cal-nav h3 { font-family: 'Cormorant Garamond', serif; font-weight: 600; font-size: 1.3rem; min-width: 200px; text-align: center; }
+  .cal-nav-btn {
+    background: #fff; border: 1px solid rgba(0,0,0,0.15); border-radius: 2px; width: 34px; height: 34px;
+    font-size: 1rem; cursor: pointer; color: var(--ink);
+  }
+  .cal-nav-btn:hover { border-color: var(--sage); color: var(--sage); }
+  .cal-weekdays { display: grid; grid-template-columns: repeat(7,1fr); gap: 3px; margin-bottom: 3px; }
+  .cal-weekdays div { text-align: center; font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); padding: 0.3rem 0; }
+  .cal-week { margin-bottom: 3px; }
+  .cal-days-row { display: grid; grid-template-columns: repeat(7,1fr); gap: 3px; }
+  .cal-day {
+    background: #fff; border-radius: 3px; min-height: 58px; padding: 0.3rem 0.4rem;
+    font-size: 0.78rem; position: relative;
+  }
+  .cal-day .cal-daynum { font-weight: 500; }
+  .cal-day .cal-rate { color: var(--sage); font-size: 0.76rem; margin-top: 0.15rem; }
+  .cal-day .cal-minnights { font-size: 0.62rem; color: var(--muted); margin-top: 0.1rem; }
+  .cal-day.other-month { background: rgba(255,255,255,0.4); color: rgba(0,0,0,0.28); }
+  .cal-day.other-month .cal-rate, .cal-day.other-month .cal-minnights { display: none; }
+  .cal-day.past { background: rgba(0,0,0,0.03); color: rgba(0,0,0,0.35); }
+  .cal-day.past .cal-daynum { text-decoration: line-through; }
+  .cal-day.past .cal-rate { color: rgba(94,122,82,0.5); }
+  .cal-day.today { box-shadow: inset 0 0 0 2px var(--sage); }
+  .cal-bars-row { display: grid; grid-template-columns: repeat(7,1fr); gap: 3px; margin-top: 3px; }
+  .cal-bar {
+    grid-row: 1; border-radius: 3px; padding: 0.28rem 0.5rem; font-size: 0.74rem; color: #fff;
+    cursor: pointer; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; display: flex; align-items: center; gap: 0.35rem;
+  }
+  .cal-bar .cal-avatar {
+    width: 16px; height: 16px; border-radius: 50%; background: rgba(255,255,255,0.35); flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center; font-size: 0.6rem; font-weight: 600;
+  }
+  .cal-bar.direct { background: var(--sage); }
+  .cal-bar.airbnb { background: #c76b8a; }
+  .cal-bar.booking_com { background: #3a5a78; }
+  .cal-bar.ext { background: #8a97a3; }
+  .cal-bar.blocked { background: #9a9186; cursor: pointer; }
+  .cal-bar:hover { filter: brightness(1.08); }
+  .cal-legend { display: flex; flex-wrap: wrap; gap: 1rem; margin: 1rem 0 2.5rem; font-size: 0.78rem; color: var(--muted); align-items: center; }
+  .cal-legend .cal-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 0.35rem; vertical-align: middle; }
+
+  /* ─── Modal ──────────────────────────────────────────────────── */
+  .modal-overlay {
+    position: fixed; inset: 0; background: rgba(20,18,16,0.55); display: flex;
+    align-items: center; justify-content: center; padding: 1.5rem; z-index: 100;
+  }
+  .modal-box {
+    background: #fff; border-radius: 6px; padding: 1.6rem 1.8rem; width: 100%; max-width: 640px;
+    max-height: 88vh; overflow-y: auto;
+  }
+  .modal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; }
+  .modal-header h3 { font-family: 'Cormorant Garamond', serif; font-weight: 600; font-size: 1.35rem; }
+  .modal-close { background: none; border: none; font-size: 1.4rem; line-height: 1; cursor: pointer; color: var(--muted); padding: 0.2rem 0.4rem; }
+  .modal-close:hover { color: var(--ink); }
+  .modal-readonly { background: rgba(94,122,82,0.07); border-radius: 4px; padding: 0.8rem 1rem; margin-bottom: 1.1rem; font-size: 0.84rem; display: grid; grid-template-columns: repeat(auto-fit,minmax(140px,1fr)); gap: 0.5rem 1rem; }
+  .modal-readonly div span { display: block; font-size: 0.66rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); }
+  .field-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.8rem; margin-bottom: 1rem; }
+  .field-grid label { display: block; font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); margin-bottom: 0.3rem; }
+  .field-grid input, .field-grid textarea {
+    width: 100%; border: 1px solid rgba(0,0,0,0.15); border-radius: 2px; padding: 0.55rem 0.6rem;
+    font-family: 'DM Sans', sans-serif; font-size: 0.85rem;
+  }
+  .field-grid .full-width { grid-column: 1 / -1; }
+  .field-grid label.checkbox-label { display: flex; align-items: center; gap: 0.5rem; text-transform: none; font-size: 0.85rem; color: var(--ink); margin-top: 0.4rem; }
+  .modal-actions { display: flex; gap: 0.7rem; flex-wrap: wrap; margin-top: 0.6rem; }
+  .modal-actions button {
+    border: none; border-radius: 2px; padding: 0.65rem 1.2rem; cursor: pointer; font-size: 0.82rem; font-family: 'DM Sans', sans-serif;
+  }
+  .modal-actions .btn-save { background: var(--sage); color: var(--cream); }
+  .modal-actions .btn-cancel-booking { background: none; border: 1px solid #b4503c; color: #b4503c; }
+  .modal-actions .btn-close { background: none; border: 1px solid rgba(0,0,0,0.2); color: var(--ink); }
+  .pricing-note { background: rgba(180,80,60,0.08); border: 1px solid rgba(180,80,60,0.25); color: #7a3325; border-radius: 3px; padding: 0.7rem 0.9rem; font-size: 0.82rem; margin-top: 0.9rem; }
 </style>
 </head>
 <body>
@@ -106,6 +189,64 @@
     </div>
   </header>
   <main>
+    <h2 style="margin-top:0;">Calendar</h2>
+    <p class="sub">Nightly rates, closed dates, and every synced booking at a glance. Click a direct booking to edit it, or a closed period to reopen it.</p>
+    <div id="nextBookingBanner" class="next-booking-banner empty" style="display:none;"></div>
+    <div id="calMsg" class="msg-box" style="display:none;"></div>
+    <div class="cal-nav">
+      <button id="calPrevBtn" class="cal-nav-btn" aria-label="Previous month">‹</button>
+      <h3 id="calMonthLabel"></h3>
+      <button id="calNextBtn" class="cal-nav-btn" aria-label="Next month">›</button>
+    </div>
+    <div class="cal-weekdays">
+      <div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div><div>Sun</div>
+    </div>
+    <div id="calWeeks"></div>
+    <div class="cal-legend">
+      <span><i class="cal-dot" style="background:var(--sage)"></i>Direct booking</span>
+      <span><i class="cal-dot" style="background:#c76b8a"></i>Airbnb</span>
+      <span><i class="cal-dot" style="background:#3a5a78"></i>Booking.com</span>
+      <span><i class="cal-dot" style="background:#8a97a3"></i>Other synced calendar</span>
+      <span><i class="cal-dot" style="background:#9a9186"></i>Closed</span>
+    </div>
+
+    <div id="editBookingOverlay" class="modal-overlay" style="display:none;">
+      <div class="modal-box">
+        <div class="modal-header">
+          <h3 id="editModalTitle">Booking</h3>
+          <button id="closeEditModalBtn" class="modal-close" aria-label="Close">&times;</button>
+        </div>
+        <div id="editBookingMsg" class="msg-box" style="display:none;"></div>
+        <div id="editBookingReadonly" class="modal-readonly"></div>
+        <div id="editBookingInfoText" style="display:none;font-size:0.88rem;color:var(--ink);margin-bottom:1rem;"></div>
+        <div id="editBookingFields">
+          <div class="field-grid">
+            <div><label>First name</label><input type="text" id="editFirstName"></div>
+            <div><label>Last name</label><input type="text" id="editLastName"></div>
+            <div><label>Email</label><input type="email" id="editEmail"></div>
+            <div><label>Phone</label><input type="text" id="editPhone"></div>
+            <div><label>Check-in</label><input type="date" id="editCheckin"></div>
+            <div><label>Check-out</label><input type="date" id="editCheckout"></div>
+            <div><label>Address line 1</label><input type="text" id="editAddress1"></div>
+            <div><label>Address line 2</label><input type="text" id="editAddress2"></div>
+            <div><label>City</label><input type="text" id="editCity"></div>
+            <div><label>Postcode</label><input type="text" id="editPostcode"></div>
+            <div class="full-width"><label>Country</label><input type="text" id="editCountry"></div>
+            <div class="full-width"><label>Message / notes</label><textarea id="editMessage" rows="3"></textarea></div>
+            <div class="full-width">
+              <label class="checkbox-label"><input type="checkbox" id="editHasDog" style="width:18px;height:18px;"> Bringing a dog</label>
+            </div>
+          </div>
+          <div id="editPricingNote" class="pricing-note" style="display:none;"></div>
+        </div>
+        <div class="modal-actions">
+          <button id="saveEditBookingBtn" class="btn-save">Save Changes</button>
+          <button id="cancelBookingBtn" class="btn-cancel-booking">Cancel Booking</button>
+          <button id="closeEditModalBtn2" class="btn-close">Close</button>
+        </div>
+      </div>
+    </div>
+
     <h2>Booking Settings</h2>
     <p class="sub">Controls how close to check-in a booking can be made.</p>
     <div id="settingsMsg" style="display:none;"></div>
@@ -1072,12 +1213,329 @@
       }
     });
 
+    // ─── Calendar ───────────────────────────────────────────────────
+    const CAL_DEFAULT_RATE = 120;
+    let calYear, calMonth; // calMonth is 0-indexed
+    let calIcalLabels = {}; // source_tag -> label, for synced-calendar bar labels
+    (function initCalDate() {
+      const now = new Date();
+      calYear = now.getFullYear();
+      calMonth = now.getMonth();
+    })();
+
+    function todayISO() {
+      const d = new Date();
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    }
+    function toISO(d) {
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    }
+    function addDays(d, n) {
+      const r = new Date(d);
+      r.setDate(r.getDate() + n);
+      return r;
+    }
+
+    function showCalMsg(text, ok) {
+      const el = document.getElementById('calMsg');
+      el.textContent = text;
+      el.className = 'msg-box ' + (ok ? 'ok' : 'error');
+      el.style.display = 'block';
+      setTimeout(() => { el.style.display = 'none'; }, 5000);
+    }
+
+    function calRateFor(dateISO, rates) {
+      const found = rates.find(r => dateISO >= r.date_from && dateISO <= r.date_to);
+      return found ? found.nightly_rate : CAL_DEFAULT_RATE;
+    }
+    function calMinNightsBand(dateISO, rates) {
+      return rates.find(r => r.date_from === dateISO && r.min_nights > 1) || null;
+    }
+
+    function calSourceInfo(source, isBlocked) {
+      if (isBlocked) return { cls: 'blocked', label: 'Closed', editable: false, reopenable: true };
+      if (source === 'direct') return { cls: 'direct', label: null, editable: true, reopenable: false };
+      if (source === 'airbnb') return { cls: 'airbnb', label: 'Airbnb', editable: false, reopenable: false };
+      if (source === 'booking_com') return { cls: 'booking_com', label: 'Booking.com', editable: false, reopenable: false };
+      return { cls: 'ext', label: calIcalLabels[source] || 'Synced', editable: false, reopenable: false };
+    }
+
+    async function renderCalendar() {
+      const rangeStart = new Date(calYear, calMonth, 1);
+      const rangeEnd = new Date(calYear, calMonth + 1, 0);
+      // Monday-first grid: pad back to the Monday on/before the 1st, and forward to the Sunday on/after the last day.
+      const startPad = (rangeStart.getDay() + 6) % 7; // days since Monday
+      const gridStart = addDays(rangeStart, -startPad);
+      const endPad = (7 - ((rangeEnd.getDay() + 6) % 7) - 1) % 7;
+      const gridEnd = addDays(rangeEnd, endPad);
+
+      document.getElementById('calMonthLabel').textContent = rangeStart.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
+
+      const [ratesRes, icalRes, bookingsRes] = await Promise.all([
+        authFetch('/rest/v1/rates?select=date_from,date_to,nightly_rate,min_nights&order=date_from.asc'),
+        authFetch('/rest/v1/ical_sources?select=source_tag,label'),
+        authFetch(`/rest/v1/bookings?select=id,checkin,checkout,source,status,is_blocked,guest_first_name,guests_count&status=eq.confirmed&checkin=lt.${toISO(gridEnd)}&checkout=gt.${toISO(gridStart)}&order=checkin.asc`),
+      ]);
+      if (!ratesRes || !icalRes || !bookingsRes) { showCalMsg('Could not load the calendar.', false); return; }
+      const rates = await ratesRes.json();
+      const icalRows = await icalRes.json();
+      calIcalLabels = {};
+      (icalRows || []).forEach(r => { calIcalLabels[r.source_tag] = r.label; });
+      const bookings = await bookingsRes.json();
+      const today = todayISO();
+
+      // Build the flat list of visible days first.
+      const days = [];
+      for (let d = new Date(gridStart); d <= gridEnd; d = addDays(d, 1)) {
+        const iso = toISO(d);
+        days.push({
+          date: new Date(d), iso,
+          inMonth: d.getMonth() === calMonth,
+          isPast: iso < today,
+          isToday: iso === today,
+          rate: calRateFor(iso, rates),
+          minBand: calMinNightsBand(iso, rates),
+          booking: (bookings || []).find(b => iso >= b.checkin && iso < b.checkout) || null,
+        });
+      }
+
+      // Split into weeks of 7 and render each week's day row + booking-bar row.
+      let html = '';
+      for (let w = 0; w < days.length; w += 7) {
+        const week = days.slice(w, w + 7);
+        const dayRow = week.map(d => `
+          <div class="cal-day ${d.inMonth ? '' : 'other-month'} ${d.isPast ? 'past' : ''} ${d.isToday ? 'today' : ''}">
+            <div class="cal-daynum">${d.date.getDate()}</div>
+            ${d.inMonth ? `<div class="cal-rate">£${Math.round(d.rate)}</div>` : ''}
+            ${d.inMonth && d.minBand ? `<div class="cal-minnights">${d.minBand.min_nights}-night min</div>` : ''}
+          </div>`).join('');
+
+        // Group consecutive days in this week that belong to the same booking into one bar segment.
+        const segments = [];
+        let cur = null;
+        week.forEach((d, i) => {
+          const bid = d.booking ? d.booking.id : null;
+          if (cur && cur.bid === bid && bid !== null) {
+            cur.end = i + 1;
+          } else {
+            if (cur) segments.push(cur);
+            cur = bid ? { bid, booking: d.booking, start: i, end: i + 1 } : null;
+          }
+        });
+        if (cur) segments.push(cur);
+
+        const barsRow = segments.map(seg => {
+          const info = calSourceInfo(seg.booking.source, seg.booking.is_blocked);
+          const label = info.label || `${seg.booking.guest_first_name || 'Guest'}${seg.booking.guests_count > 1 ? ' +' + (seg.booking.guests_count - 1) : ''}`;
+          const initial = (seg.booking.guest_first_name || info.label || '?').charAt(0).toUpperCase();
+          return `<div class="cal-bar ${info.cls}" data-id="${seg.booking.id}" style="grid-column:${seg.start + 1} / ${seg.end + 1};">
+            <span class="cal-avatar">${initial}</span><span>${label}</span>
+          </div>`;
+        }).join('');
+
+        html += `<div class="cal-week">
+          <div class="cal-days-row">${dayRow}</div>
+          <div class="cal-bars-row">${barsRow}</div>
+        </div>`;
+      }
+      document.getElementById('calWeeks').innerHTML = html;
+    }
+
+    document.getElementById('calPrevBtn').addEventListener('click', () => {
+      calMonth--; if (calMonth < 0) { calMonth = 11; calYear--; }
+      renderCalendar();
+    });
+    document.getElementById('calNextBtn').addEventListener('click', () => {
+      calMonth++; if (calMonth > 11) { calMonth = 0; calYear++; }
+      renderCalendar();
+    });
+
+    document.getElementById('calWeeks').addEventListener('click', async (e) => {
+      const bar = e.target.closest('.cal-bar');
+      if (!bar) return;
+      const id = bar.dataset.id;
+      if (bar.classList.contains('blocked')) {
+        if (!confirm('Reopen these dates? They will become bookable again.')) return;
+        const res = await authFetch(`/rest/v1/bookings?id=eq.${id}`, { method: 'PATCH', body: JSON.stringify({ status: 'cancelled' }) });
+        if (res && res.ok) { showCalMsg('Dates reopened.', true); renderCalendar(); loadClosures(); } else showCalMsg('Could not reopen.', false);
+        return;
+      }
+      if (bar.classList.contains('direct')) { openEditBookingModal(id); return; }
+      // Airbnb / Booking.com / other synced — read-only info.
+      openReadOnlyBookingInfo(id);
+    });
+
+    // ─── Next direct-booking banner ────────────────────────────────
+    function humanCheckinCountdown(checkinISO) {
+      const today = new Date(); today.setHours(0, 0, 0, 0);
+      const checkin = new Date(checkinISO + 'T00:00:00');
+      const days = Math.round((checkin.getTime() - today.getTime()) / 86400000);
+      const dateStr = checkin.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
+      if (days === 0) return `today (${dateStr})`;
+      if (days === 1) return `tomorrow (${dateStr})`;
+      return `in ${days} days (${dateStr})`;
+    }
+
+    async function loadNextBookingBanner() {
+      const banner = document.getElementById('nextBookingBanner');
+      const res = await authFetch(`/rest/v1/bookings?select=guest_first_name,guests_count,checkin&source=eq.direct&status=eq.confirmed&is_blocked=eq.false&checkin=gte.${todayISO()}&order=checkin.asc&limit=1`);
+      if (!res) return;
+      const rows = await res.json();
+      banner.style.display = 'flex';
+      if (!Array.isArray(rows) || rows.length === 0) {
+        banner.classList.add('empty');
+        banner.innerHTML = `<div><div class="nbb-label">Next direct booking</div><div class="nbb-main">No upcoming direct bookings on the books.</div></div>`;
+        return;
+      }
+      const b = rows[0];
+      banner.classList.remove('empty');
+      const extra = b.guests_count > 1 ? ` +${b.guests_count - 1}` : '';
+      banner.innerHTML = `<div><div class="nbb-label">Next direct booking checks in</div><div class="nbb-main">${b.guest_first_name || 'Guest'}${extra} — ${humanCheckinCountdown(b.checkin)}</div></div>`;
+    }
+
+    // ─── Edit / view booking modal ──────────────────────────────────
+    let editingBookingId = null;
+
+    function showEditBookingMsg(text, ok) {
+      const el = document.getElementById('editBookingMsg');
+      el.textContent = text;
+      el.className = 'msg-box ' + (ok ? 'ok' : 'error');
+      el.style.display = 'block';
+    }
+
+    function closeEditModal() {
+      document.getElementById('editBookingOverlay').style.display = 'none';
+      editingBookingId = null;
+    }
+    document.getElementById('closeEditModalBtn').addEventListener('click', closeEditModal);
+    document.getElementById('closeEditModalBtn2').addEventListener('click', closeEditModal);
+
+    function moneyOrDash(n) { return n == null ? '—' : money(n); }
+
+    async function openReadOnlyBookingInfo(id) {
+      const res = await authFetch(`/rest/v1/bookings?select=*&id=eq.${id}`);
+      if (!res) return;
+      const rows = await res.json();
+      const b = rows && rows[0];
+      if (!b) return;
+      editingBookingId = null;
+      document.getElementById('editModalTitle').textContent = 'Synced Booking';
+      document.getElementById('editBookingMsg').style.display = 'none';
+      document.getElementById('editBookingReadonly').innerHTML = '';
+      document.getElementById('editBookingReadonly').style.display = 'none';
+      document.getElementById('editBookingFields').style.display = 'none';
+      const info = calSourceInfo(b.source, b.is_blocked);
+      document.getElementById('editBookingInfoText').style.display = 'block';
+      document.getElementById('editBookingInfoText').innerHTML =
+        `${info.label} booking, ${b.checkin} to ${b.checkout}. This is synced automatically from ${info.label} and can only be changed on that platform.`;
+      document.getElementById('cancelBookingBtn').style.display = 'none';
+      document.getElementById('saveEditBookingBtn').style.display = 'none';
+      document.getElementById('editBookingOverlay').style.display = 'flex';
+    }
+
+    async function openEditBookingModal(id) {
+      const res = await authFetch(`/rest/v1/bookings?select=*&id=eq.${id}`);
+      if (!res) return;
+      const rows = await res.json();
+      const b = rows && rows[0];
+      if (!b) return;
+      editingBookingId = id;
+
+      document.getElementById('editModalTitle').textContent = `${b.guest_first_name || ''} ${b.guest_last_name || ''}`.trim() || 'Direct Booking';
+      document.getElementById('editBookingMsg').style.display = 'none';
+      document.getElementById('editBookingInfoText').style.display = 'none';
+      document.getElementById('editBookingFields').style.display = 'block';
+      document.getElementById('cancelBookingBtn').style.display = 'inline-block';
+      document.getElementById('saveEditBookingBtn').style.display = 'inline-block';
+      document.getElementById('editPricingNote').style.display = 'none';
+
+      const outstanding = Math.max(0, Math.round(((b.total_amount || 0) - (b.amount_paid || 0)) * 100) / 100);
+      document.getElementById('editBookingReadonly').style.display = 'grid';
+      document.getElementById('editBookingReadonly').innerHTML = `
+        <div><span>Booking ref</span>${b.booking_ref || '—'}</div>
+        <div><span>Total</span>${moneyOrDash(b.total_amount)}</div>
+        <div><span>Paid so far</span>${moneyOrDash(b.amount_paid)}</div>
+        <div><span>Outstanding</span>${moneyOrDash(outstanding)}</div>
+        <div><span>Payment type</span>${b.payment_type || '—'}</div>
+      `;
+
+      document.getElementById('editFirstName').value = b.guest_first_name || '';
+      document.getElementById('editLastName').value = b.guest_last_name || '';
+      document.getElementById('editEmail').value = b.guest_email || '';
+      document.getElementById('editPhone').value = b.guest_phone || '';
+      document.getElementById('editCheckin').value = b.checkin || '';
+      document.getElementById('editCheckout').value = b.checkout || '';
+      document.getElementById('editAddress1').value = b.address_line1 || '';
+      document.getElementById('editAddress2').value = b.address_line2 || '';
+      document.getElementById('editCity').value = b.city || '';
+      document.getElementById('editPostcode').value = b.postcode || '';
+      document.getElementById('editCountry').value = b.country || '';
+      document.getElementById('editMessage').value = b.message || '';
+      document.getElementById('editHasDog').checked = !!b.has_dog;
+
+      document.getElementById('editBookingOverlay').style.display = 'flex';
+    }
+
+    document.getElementById('saveEditBookingBtn').addEventListener('click', async () => {
+      if (!editingBookingId) return;
+      const payload = {
+        booking_id: editingBookingId,
+        first_name: document.getElementById('editFirstName').value.trim(),
+        last_name: document.getElementById('editLastName').value.trim(),
+        email: document.getElementById('editEmail').value.trim(),
+        phone: document.getElementById('editPhone').value.trim(),
+        address_line1: document.getElementById('editAddress1').value.trim(),
+        address_line2: document.getElementById('editAddress2').value.trim(),
+        city: document.getElementById('editCity').value.trim(),
+        postcode: document.getElementById('editPostcode').value.trim(),
+        country: document.getElementById('editCountry').value.trim(),
+        message: document.getElementById('editMessage').value,
+        has_dog: document.getElementById('editHasDog').checked,
+        checkin: document.getElementById('editCheckin').value,
+        checkout: document.getElementById('editCheckout').value,
+      };
+      const btn = document.getElementById('saveEditBookingBtn');
+      btn.disabled = true;
+      const res = await authFetch('/functions/v1/update-booking', { method: 'POST', body: JSON.stringify(payload) });
+      const data = res ? await res.json() : { ok: false };
+      btn.disabled = false;
+      if (!data.ok) { showEditBookingMsg(data.error || 'Could not save changes.', false); return; }
+
+      showEditBookingMsg('Saved.', true);
+      if (data.pricing) {
+        const note = document.getElementById('editPricingNote');
+        note.style.display = 'block';
+        note.textContent = `Dates changed — new total is ${money(data.pricing.total_amount)}, ${money(data.pricing.amount_paid)} paid so far, ${money(data.pricing.outstanding)} outstanding. Stripe was NOT automatically charged or refunded — please collect or refund any difference yourself.`;
+      }
+      renderCalendar();
+      loadNextBookingBanner();
+      loadClosures();
+    });
+
+    document.getElementById('cancelBookingBtn').addEventListener('click', async () => {
+      if (!editingBookingId) return;
+      if (!confirm('Cancel this booking? The dates will become available again. This does not automatically refund any payment taken.')) return;
+      const btn = document.getElementById('cancelBookingBtn');
+      btn.disabled = true;
+      const res = await authFetch('/functions/v1/update-booking', { method: 'POST', body: JSON.stringify({ booking_id: editingBookingId, cancel: true }) });
+      const data = res ? await res.json() : { ok: false };
+      btn.disabled = false;
+      if (!data.ok) { showEditBookingMsg(data.error || 'Could not cancel booking.', false); return; }
+      closeEditModal();
+      showCalMsg('Booking cancelled.', true);
+      renderCalendar();
+      loadNextBookingBanner();
+      loadClosures();
+    });
+
     loadOfferTemplate();
     loadDiscounts();
     loadClosures();
     loadReviewsAdmin();
     loadFireChecks();
     loadRates();
+    renderCalendar();
+    loadNextBookingBanner();
   </script>
 </body>
 </html>
