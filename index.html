@@ -1608,17 +1608,14 @@
           }
         }
       } else {
-        // Picking check-in: does a valid stay of at least this date's minimum fit here?
-        const requiredMin = getMinNights(thisDate);
-        const run = maxConsecutiveNightsFrom(thisDate);
-        if (run < requiredMin) {
-          el.classList.add('below-min');
-          el.title = `Minimum stay from this date is ${requiredMin} nights`;
-          anyBelowMin = true;
-        } else {
-          el.classList.add('available');
-          el.addEventListener('click', () => selectDay(viewYear, viewMonth, d));
-        }
+        // Picking check-in: any night that isn't itself part of someone
+        // else's stay is shown as open. Whether a full-length stay actually
+        // fits from here (the min-stay rule, or this being a turnover day
+        // that's checkout-only) is checked — with an explanation — only
+        // when it's clicked, rather than greying it out pre-emptively and
+        // making the property look less available than it really is.
+        el.classList.add('available');
+        el.addEventListener('click', () => selectDay(viewYear, viewMonth, d));
       }
 
       if (thisDate.getTime() === today.getTime()) el.classList.add('today');
@@ -1703,6 +1700,14 @@
       // Don't allow checkout-only dates as a check-in
       if (isCheckoutOnly(y, m, d)) {
         showToast('That date is only available as a checkout — please select your check-in date first.');
+        return;
+      }
+      // Every open date is shown as selectable, but a check-in still needs
+      // a full-length stay to actually fit from here.
+      const requiredMin = getMinNights(clicked);
+      const run = maxConsecutiveNightsFrom(clicked);
+      if (run < requiredMin) {
+        showToast(`You can't check in on ${fmtSelLabel(y, m, d)} — the minimum stay from this date is ${requiredMin} night${requiredMin === 1 ? '' : 's'}, and another booking starts before that.`);
         return;
       }
       selStart = {y,m,d}; selEnd = null;
