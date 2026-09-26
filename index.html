@@ -658,6 +658,12 @@
     border-radius: 2px;
     padding: 2.2rem;
     position: sticky; top: 90px;
+    /* Tells the browser this panel is dark-themed, so the parts of native
+       controls we don't style ourselves — a <select>'s dropdown arrow/box
+       chrome, a date input's calendar popup, a checkbox's default face —
+       are drawn with light-on-dark defaults instead of assuming a light
+       page and silently painting dark text nobody can read here. */
+    color-scheme: dark;
   }
   .bp-title {
     font-family: 'Cormorant Garamond', serif;
@@ -686,6 +692,8 @@
     width: 100%;
     transition: border-color 0.2s;
     -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
   }
   .bp-field input:focus, .bp-field select:focus { border-color: var(--sage); }
   .bp-field select option { background: var(--ink); color: var(--cream); }
@@ -1153,14 +1161,25 @@
             <input type="date" id="bpCheckout" min="">
           </div>
         </div>
-        <div class="bp-field" style="margin-bottom:0.75rem">
-          <label>Guests</label>
-          <select id="bpGuests">
-            <option value="1">1 Guest</option>
-            <option value="2" selected>2 Guests</option>
-            <option value="3">3 Guests</option>
-            <option value="4">4 Guests</option>
-          </select>
+        <div class="bp-row" style="margin-bottom:0.75rem">
+          <div class="bp-field">
+            <label>Adults</label>
+            <select id="bpAdults">
+              <option value="1">1 Adult</option>
+              <option value="2" selected>2 Adults</option>
+              <option value="3">3 Adults</option>
+              <option value="4">4 Adults</option>
+            </select>
+          </div>
+          <div class="bp-field">
+            <label>Children</label>
+            <select id="bpChildren">
+              <option value="0" selected>0 Children</option>
+              <option value="1">1 Child</option>
+              <option value="2">2 Children</option>
+              <option value="3">3 Children</option>
+            </select>
+          </div>
         </div>
         <div class="bp-divider"></div>
         <div class="bp-summary" id="bpSummary">
@@ -1230,7 +1249,6 @@
             <input type="text" id="bpCountry" value="United Kingdom">
           </div>
 
-          <div id="bpExtraGuestsWrap" style="margin-top:1rem;"></div>
 
           <label for="bpHasDog" style="margin:1rem 0 0.75rem;display:flex;align-items:center;gap:0.7rem;background:rgba(247,242,234,0.05);border:1px solid rgba(247,242,234,0.12);border-radius:2px;padding:0.75rem 0.9rem;cursor:pointer;">
             <input type="checkbox" id="bpHasDog" style="width:20px;height:20px;flex-shrink:0;accent-color:var(--sage);cursor:pointer;">
@@ -1761,7 +1779,7 @@
   function computeStep2Pricing() {
     const ci = document.getElementById('bpCheckin').value;
     const co = document.getElementById('bpCheckout').value;
-    const guests = parseInt(document.getElementById('bpGuests').value, 10) || 1;
+    const guests = getGuestCounts().total;
     const hasDog = document.getElementById('bpHasDog').checked;
     const nights = Math.round((new Date(co) - new Date(ci)) / 86400000);
     let total = 0;
@@ -1892,44 +1910,42 @@
     } catch (e) { /* best-effort — the 30-min expiry and cleanup job are the fallback */ }
   });
 
-  function renderExtraGuestRows(totalGuests) {
-    const wrap = document.getElementById('bpExtraGuestsWrap');
-    wrap.innerHTML = '';
-    const extra = Math.max(0, totalGuests - 1);
-    if (extra === 0) return;
-    wrap.insertAdjacentHTML('beforeend', `<p style="font-size:0.75rem;text-transform:uppercase;letter-spacing:0.08em;color:rgba(247,242,234,0.5);margin-bottom:0.6rem;">Other guests</p>`);
-    for (let i = 0; i < extra; i++) {
-      wrap.insertAdjacentHTML('beforeend', `
-        <p style="font-size:0.78rem;color:rgba(247,242,234,0.55);margin-bottom:0.4rem;">Guest ${i+2}</p>
-        <div class="bp-row bp-extra-guest" style="margin-bottom:0.75rem;">
-          <div class="bp-field">
-            <label>Full name *</label>
-            <input type="text" class="bp-guest-name" required placeholder="Full name">
-          </div>
-          <div class="bp-field">
-            <label>Adult or child?</label>
-            <select class="bp-guest-type">
-              <option value="adult">Adult</option>
-              <option value="child">Child</option>
-            </select>
-          </div>
-        </div>`);
-    }
+  const MAX_OCCUPANCY = 4;
+
+  function getGuestCounts() {
+    const adults = parseInt(document.getElementById('bpAdults').value, 10) || 1;
+    const children = parseInt(document.getElementById('bpChildren').value, 10) || 0;
+    return { adults, children, total: adults + children };
   }
+
+  // Keeps the two selects from ever adding up to more than the property's
+  // max occupancy, rather than letting the guest pick an invalid combination
+  // and finding out only after they've filled in the rest of the form.
+  function clampGuestSelections() {
+    const adultsSel = document.getElementById('bpAdults');
+    const childrenSel = document.getElementById('bpChildren');
+    const adults = parseInt(adultsSel.value, 10) || 1;
+    const maxChildren = Math.max(0, MAX_OCCUPANCY - adults);
+    Array.from(childrenSel.options).forEach(opt => {
+      opt.disabled = parseInt(opt.value, 10) > maxChildren;
+    });
+    if (parseInt(childrenSel.value, 10) > maxChildren) childrenSel.value = String(maxChildren);
+  }
+  document.getElementById('bpAdults').addEventListener('change', clampGuestSelections);
+  clampGuestSelections();
 
   document.getElementById('bpSubmit').addEventListener('click', async () => {
     const ci = document.getElementById('bpCheckin').value;
     const co = document.getElementById('bpCheckout').value;
     if (!ci || !co) { showToast('Please select your dates first.'); return; }
-    const guests = parseInt(document.getElementById('bpGuests').value, 10) || 1;
+    const { total: guests } = getGuestCounts();
+    if (guests > MAX_OCCUPANCY) { showToast(`Maximum occupancy is ${MAX_OCCUPANCY} guests.`); return; }
 
     // Fresh discount state for this new pass through Step 2
     resetDiscountUI();
 
     // Show the pricing summary for these dates in Step 2
     refreshStep2PriceSummary();
-
-    renderExtraGuestRows(guests);
 
     document.getElementById('bpStep1').style.display = 'none';
     document.getElementById('bpStep2').style.display = 'block';
@@ -1974,10 +1990,7 @@
     submitBtn.disabled = true;
     submitBtn.textContent = 'Please wait…';
 
-    const guestRows = Array.from(document.querySelectorAll('.bp-extra-guest')).map(row => ({
-      full_name: row.querySelector('.bp-guest-name').value.trim(),
-      guest_type: row.querySelector('.bp-guest-type').value,
-    })).filter(g => g.full_name);
+    const { adults, children } = getGuestCounts();
 
     const payload = {
       hold_id: activeHold ? activeHold.id : null,
@@ -1994,7 +2007,8 @@
       country: document.getElementById('bpCountry').value,
       has_dog: document.getElementById('bpHasDog').checked,
       marketing_consent: document.getElementById('bpMarketingConsent').checked,
-      guests: guestRows,
+      adults,
+      children,
       message: document.getElementById('bpMessage').value,
       discount_code: appliedDiscountCode || undefined,
     };
