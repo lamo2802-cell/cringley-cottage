@@ -1241,6 +1241,12 @@
             <label>Anything to tell us?</label>
             <textarea id="bpMessage" rows="3" placeholder="Special requirements, questions..." style="background:rgba(247,242,234,0.07);border:1px solid rgba(247,242,234,0.12);color:var(--cream);padding:0.65rem 0.85rem;font-family:'DM Sans',sans-serif;font-size:0.85rem;border-radius:2px;width:100%;resize:vertical;outline:none;transition:border-color 0.2s;"></textarea>
           </div>
+
+          <label for="bpMarketingConsent" style="margin:0 0 1rem;display:flex;align-items:flex-start;gap:0.7rem;background:rgba(247,242,234,0.05);border:1px solid rgba(247,242,234,0.12);border-radius:2px;padding:0.75rem 0.9rem;cursor:pointer;">
+            <input type="checkbox" id="bpMarketingConsent" style="width:20px;height:20px;flex-shrink:0;margin-top:0.1rem;accent-color:var(--sage);cursor:pointer;">
+            <span style="font-size:0.82rem;line-height:1.5;">I'd like to receive occasional offers and updates from Cringley Cottage by email. (Optional — you can unsubscribe any time.)</span>
+          </label>
+
           <button type="submit" class="bp-submit" id="bpFinalSubmit">Continue to Payment</button>
           <p class="bp-small" id="bpPaymentNote">25% deposit to secure &middot; balance due before arrival</p>
         </form>
@@ -1972,6 +1978,7 @@
       postcode: document.getElementById('bpPostcode').value,
       country: document.getElementById('bpCountry').value,
       has_dog: document.getElementById('bpHasDog').checked,
+      marketing_consent: document.getElementById('bpMarketingConsent').checked,
       guests: guestRows,
       message: document.getElementById('bpMessage').value,
       discount_code: appliedDiscountCode || undefined,
