@@ -288,11 +288,24 @@
     </div>
 
     <h2 style="margin-top:2.5rem;">Mailing List</h2>
-    <p class="sub">Guests who ticked "I'd like to receive occasional offers and updates" when booking directly. Export it for whatever you send campaigns from — every email you send them still needs its own unsubscribe link.</p>
+    <p class="sub">Guests who ticked "I'd like to receive occasional offers and updates" when booking directly.</p>
     <div id="mailingListMsg" style="display:none;"></div>
-    <div style="background:#fff;border-radius:4px;padding:1.2rem 1.4rem;box-shadow:0 1px 4px rgba(0,0,0,0.08);margin-bottom:2.5rem;display:flex;gap:1rem;align-items:center;flex-wrap:wrap;">
-      <button id="exportMailingListBtn" style="background:var(--sage);color:var(--cream);border:none;padding:0.6rem 1.1rem;border-radius:2px;cursor:pointer;font-size:0.8rem;">Export Subscribed Guests (CSV)</button>
+    <div style="background:#fff;border-radius:4px;padding:1.2rem 1.4rem;box-shadow:0 1px 4px rgba(0,0,0,0.08);margin-bottom:1.2rem;display:flex;gap:1rem;align-items:center;flex-wrap:wrap;">
+      <button id="exportMailingListBtn" style="background:none;border:1px solid var(--sage);color:var(--sage);padding:0.6rem 1.1rem;border-radius:2px;cursor:pointer;font-size:0.8rem;">Export Subscribed Guests (CSV)</button>
       <span id="mailingListCount" style="font-size:0.82rem;color:var(--muted);"></span>
+    </div>
+
+    <p class="sub" style="margin-top:-0.6rem;">Send an offer straight from here instead — each guest gets their own individual email, so nobody ever sees another recipient's address.</p>
+    <div style="background:#fff;border-radius:4px;padding:1.2rem 1.4rem;box-shadow:0 1px 4px rgba(0,0,0,0.08);margin-bottom:2.5rem;">
+      <label style="display:block;font-size:0.68rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted);margin-bottom:0.3rem;">Subject</label>
+      <input type="text" id="offerSubject" style="width:100%;border:1px solid rgba(0,0,0,0.15);border-radius:2px;padding:0.55rem 0.6rem;font-family:'DM Sans',sans-serif;font-size:0.85rem;margin-bottom:0.9rem;">
+      <label style="display:block;font-size:0.68rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted);margin-bottom:0.3rem;">Message (blank lines start a new paragraph; lines starting with "- " become a bullet list)</label>
+      <textarea id="offerBody" rows="7" style="width:100%;border:1px solid rgba(0,0,0,0.15);border-radius:2px;padding:0.6rem 0.7rem;font-family:'DM Sans',sans-serif;font-size:0.85rem;margin-bottom:0.9rem;"></textarea>
+      <div style="display:flex;gap:0.7rem;flex-wrap:wrap;align-items:center;">
+        <button id="saveOfferTemplateBtn" style="background:none;border:1px solid rgba(0,0,0,0.2);color:var(--ink);padding:0.6rem 1.1rem;border-radius:2px;cursor:pointer;font-size:0.8rem;">Save Template</button>
+        <button id="sendOfferBtn" style="background:var(--sage);color:var(--cream);border:none;padding:0.6rem 1.1rem;border-radius:2px;cursor:pointer;font-size:0.8rem;">Send Offer</button>
+      </div>
+      <p id="lastOfferSentNote" style="font-size:0.78rem;color:var(--muted);margin-top:0.7rem;"></p>
     </div>
 
     <h2 style="margin-top:2.5rem;">Accounts</h2>
@@ -990,6 +1003,76 @@
       showMailingListMsg(`Exported ${unique.length} guest${unique.length === 1 ? '' : 's'}.`, true);
     });
 
+    // ─── Offer email (editable template, sent one-to-one) ─────────────
+    async function loadOfferTemplate() {
+      const res = await authFetch('/rest/v1/site_settings?select=offer_email_subject,offer_email_text&id=eq.1');
+      if (res) {
+        const rows = await res.json();
+        if (Array.isArray(rows) && rows[0]) {
+          document.getElementById('offerSubject').value = rows[0].offer_email_subject || '';
+          document.getElementById('offerBody').value = rows[0].offer_email_text || '';
+        }
+      }
+      const lastRes = await authFetch('/rest/v1/marketing_sends?select=subject,recipient_count,created_at&order=created_at.desc&limit=1');
+      const note = document.getElementById('lastOfferSentNote');
+      if (lastRes) {
+        const lastRows = await lastRes.json();
+        if (Array.isArray(lastRows) && lastRows[0]) {
+          const l = lastRows[0];
+          const when = new Date(l.created_at).toLocaleString('en-GB', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+          note.textContent = `Last sent: "${l.subject}" to ${l.recipient_count} guest${l.recipient_count === 1 ? '' : 's'} on ${when}.`;
+        } else {
+          note.textContent = 'No offer email has been sent yet.';
+        }
+      }
+    }
+
+    document.getElementById('saveOfferTemplateBtn').addEventListener('click', async () => {
+      const subject = document.getElementById('offerSubject').value.trim();
+      const body = document.getElementById('offerBody').value;
+      if (!subject || !body.trim()) { showMailingListMsg('Subject and message are both required.', false); return; }
+      const res = await authFetch('/rest/v1/site_settings?id=eq.1', {
+        method: 'PATCH',
+        body: JSON.stringify({ offer_email_subject: subject, offer_email_text: body }),
+      });
+      if (res && res.ok) showMailingListMsg('Template saved.', true); else showMailingListMsg('Save failed.', false);
+    });
+
+    document.getElementById('sendOfferBtn').addEventListener('click', async () => {
+      const subject = document.getElementById('offerSubject').value.trim();
+      const body = document.getElementById('offerBody').value;
+      if (!subject || !body.trim()) { showMailingListMsg('Subject and message are both required.', false); return; }
+
+      const sendBtn = document.getElementById('sendOfferBtn');
+      sendBtn.disabled = true;
+      const previewRes = await authFetch('/functions/v1/send-marketing-offer', { method: 'POST', body: JSON.stringify({ subject, body, dry_run: true }) });
+      const preview = previewRes ? await previewRes.json() : { ok: false };
+      sendBtn.disabled = false;
+      if (!preview.ok) { showMailingListMsg(preview.error || 'Could not check the recipient list.', false); return; }
+
+      if (preview.recipient_count === 0) {
+        showMailingListMsg('No guests have opted in yet — nothing to send.', false);
+        return;
+      }
+
+      const confirmed = confirm(`This will send "${subject}" to ${preview.recipient_count} guest${preview.recipient_count === 1 ? '' : 's'}, each in their own individual email. Send now?`);
+      if (!confirmed) return;
+
+      sendBtn.disabled = true;
+      sendBtn.textContent = 'Sending…';
+      const sendRes = await authFetch('/functions/v1/send-marketing-offer', { method: 'POST', body: JSON.stringify({ subject, body, dry_run: false }) });
+      const result = sendRes ? await sendRes.json() : { ok: false };
+      sendBtn.disabled = false;
+      sendBtn.textContent = 'Send Offer';
+      if (result.ok) {
+        showMailingListMsg(`Sent to ${result.sent} guest${result.sent === 1 ? '' : 's'}.`, true);
+        loadOfferTemplate();
+      } else {
+        showMailingListMsg(result.error || 'Send failed.', false);
+      }
+    });
+
+    loadOfferTemplate();
     loadDiscounts();
     loadClosures();
     loadReviewsAdmin();
