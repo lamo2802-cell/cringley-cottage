@@ -495,6 +495,17 @@
     const SUPABASE_URL = 'https://yfeyswuxhgezkpcjhznp.supabase.co';
     const SUPABASE_ANON_KEY = 'sb_publishable_96mc6z7EpkjnKPsMX0z5Ug_BJ7MDBNp';
 
+    // Every value below can originate from someone other than the owner —
+    // a guest's own booking form, a synced Airbnb/Booking.com feed, or a
+    // staff member's fire-check submission — before it gets written into
+    // innerHTML anywhere on this page. Escape it, or a guest name like
+    // <img src=x onerror=...> would run with the owner's own session.
+    function escapeHtml(s) {
+      return (s ?? '').toString()
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    }
+
     function getSession() {
       try { return JSON.parse(localStorage.getItem('cc_session')); } catch { return null; }
     }
@@ -551,7 +562,7 @@
     function rowHtml(r) {
       return `
         <tr data-id="${r.id}">
-          <td data-label="Label"><input type="text" class="f-label" value="${r.label ?? ''}"></td>
+          <td data-label="Label"><input type="text" class="f-label" value="${escapeHtml(r.label ?? '')}"></td>
           <td data-label="From"><input type="date" class="f-from" value="${r.date_from}"></td>
           <td data-label="To"><input type="date" class="f-to" value="${r.date_to}"></td>
           <td data-label="£/night"><input type="number" class="f-rate" value="${r.nightly_rate}"></td>
@@ -638,13 +649,13 @@
         return `
           <details class="fire-card">
             <summary>
-              <span>${r.check_date} — ${TYPE_LABELS[r.check_type] || r.check_type} — <strong>${r.inspected_by}</strong></span>
+              <span>${escapeHtml(r.check_date)} — ${escapeHtml(TYPE_LABELS[r.check_type] || r.check_type)} — <strong>${escapeHtml(r.inspected_by)}</strong></span>
               <span class="fire-status ${anyNo ? 'issue' : 'clear'}">${anyNo ? 'Issue flagged' : 'All clear'}</span>
             </summary>
             <div class="fire-detail">
-              ${items.map(i => `<div class="fire-item-row"><span>${i.n}. ${i.label}</span><span class="ans ${i.answer}">${(i.answer || '—').toUpperCase()}</span></div>`).join('')}
-              ${actions.length > 0 ? `<div class="fire-actions-list"><strong>Actions:</strong><br>` + actions.map(a => `${a.action} — ${a.by_whom || '?'} — ${a.when || '?'}`).join('<br>') + `</div>` : ''}
-              ${r.notes ? `<div class="fire-actions-list"><strong>Notes:</strong> ${r.notes}</div>` : ''}
+              ${items.map(i => `<div class="fire-item-row"><span>${escapeHtml(i.n)}. ${escapeHtml(i.label)}</span><span class="ans ${i.answer === 'no' ? 'no' : 'yes'}">${escapeHtml((i.answer || '—').toUpperCase())}</span></div>`).join('')}
+              ${actions.length > 0 ? `<div class="fire-actions-list"><strong>Actions:</strong><br>` + actions.map(a => `${escapeHtml(a.action)} — ${escapeHtml(a.by_whom || '?')} — ${escapeHtml(a.when || '?')}`).join('<br>') + `</div>` : ''}
+              ${r.notes ? `<div class="fire-actions-list"><strong>Notes:</strong> ${escapeHtml(r.notes)}</div>` : ''}
             </div>
           </details>`;
       }).join('');
@@ -663,13 +674,13 @@
       const tbody = document.getElementById('staffBody');
       if (!res) return;
       const data = await res.json();
-      if (!data.ok) { tbody.innerHTML = `<tr><td colspan="5" style="color:#b4503c">${data.error || 'Could not load accounts.'}</td></tr>`; return; }
+      if (!data.ok) { tbody.innerHTML = `<tr><td colspan="5" style="color:#b4503c">${escapeHtml(data.error) || 'Could not load accounts.'}</td></tr>`; return; }
       if (data.accounts.length === 0) { tbody.innerHTML = '<tr><td colspan="5" style="color:var(--muted)">No accounts yet.</td></tr>'; return; }
       const roleLabel = r => r === 'owner' ? 'Owner' : 'Staff';
       tbody.innerHTML = data.accounts.map(s => `
         <tr data-id="${s.id}">
-          <td data-label="Name">${s.display_name || '—'}</td>
-          <td data-label="Email">${s.email}</td>
+          <td data-label="Name">${escapeHtml(s.display_name) || '—'}</td>
+          <td data-label="Email">${escapeHtml(s.email)}</td>
           <td data-label="Role">${roleLabel(s.role)}</td>
           <td data-label="Last signed in">${s.last_sign_in_at ? new Date(s.last_sign_in_at).toLocaleDateString('en-GB') : 'Never'}</td>
           <td class="row-actions">${s.is_self ? '<span style="color:var(--muted);font-size:0.78rem;">This is you</span>' : '<button class="danger deleteStaffBtn">Delete</button>'}</td>
@@ -740,8 +751,8 @@
       }
       tbody.innerHTML = rows.map(r => `
         <tr data-id="${r.id}">
-          <td data-label="Label">${r.label}</td>
-          <td data-label="Feed URL" style="font-size:0.78rem;color:var(--muted);word-break:break-all;">${maskUrl(r.url)}</td>
+          <td data-label="Label">${escapeHtml(r.label)}</td>
+          <td data-label="Feed URL" style="font-size:0.78rem;color:var(--muted);word-break:break-all;">${escapeHtml(maskUrl(r.url))}</td>
           <td class="row-actions"><button class="danger deleteIcalBtn">Delete</button></td>
         </tr>`).join('');
     }
@@ -908,8 +919,8 @@
       wrap.innerHTML = rows.map(r => `
         <div class="review-card" data-id="${r.id}">
           <div class="rc-body">
-            <div class="rc-meta">${r.guest_name || 'Verified Guest'} · ${REVIEW_SOURCE_LABELS[r.source] || r.source} · ${r.rating}/${r.rating_max}${r.featured ? '' : ' · Hidden'}</div>
-            <div class="rc-text">${r.review_text}</div>
+            <div class="rc-meta">${escapeHtml(r.guest_name) || 'Verified Guest'} · ${escapeHtml(REVIEW_SOURCE_LABELS[r.source] || r.source)} · ${r.rating}/${r.rating_max}${r.featured ? '' : ' · Hidden'}</div>
+            <div class="rc-text">${escapeHtml(r.review_text)}</div>
           </div>
           <div class="rc-actions">
             <button class="rc-toggle">${r.featured ? 'Hide' : 'Show'}</button>
@@ -976,7 +987,7 @@
       }
       tbody.innerHTML = rows.map(r => `
         <tr data-id="${r.id}">
-          <td data-label="Code"><strong>${r.code}</strong></td>
+          <td data-label="Code"><strong>${escapeHtml(r.code)}</strong></td>
           <td data-label="% off">${r.percent_off}%</td>
           <td data-label="Used">${r.times_used}${r.max_uses ? ' / ' + r.max_uses : ''}</td>
           <td data-label="Expires">${r.expires_at || '—'}</td>
@@ -1049,7 +1060,7 @@
         <tr data-id="${r.id}">
           <td data-label="From">${r.checkin}</td>
           <td data-label="To">${r.checkout}</td>
-          <td data-label="Note">${r.message || '—'}</td>
+          <td data-label="Note">${escapeHtml(r.message) || '—'}</td>
           <td class="row-actions"><button class="reopen-btn">Reopen</button></td>
         </tr>`).join('');
     }
@@ -1140,7 +1151,12 @@
     }
 
     function csvField(v) {
-      const s = (v ?? '').toString();
+      let s = (v ?? '').toString();
+      // Guest names/emails are free text from the public booking form. If a
+      // value starts with =, +, -, or @, Excel/Sheets can read it back as a
+      // formula (CSV/"formula injection") — neutralize that with a leading
+      // apostrophe before the usual comma/quote/newline CSV escaping.
+      if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;
       return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
     }
 
@@ -1283,7 +1299,7 @@
       if (source === 'direct') return { cls: 'direct', label: null, editable: true, reopenable: false };
       if (source === 'airbnb') return { cls: 'airbnb', label: 'Airbnb', editable: false, reopenable: false };
       if (source === 'booking_com') return { cls: 'booking_com', label: 'Booking.com', editable: false, reopenable: false };
-      return { cls: 'ext', label: calIcalLabels[source] || 'Synced', editable: false, reopenable: false };
+      return { cls: 'ext', label: escapeHtml(calIcalLabels[source]) || 'Synced', editable: false, reopenable: false };
     }
 
     async function renderCalendar() {
@@ -1352,8 +1368,8 @@
 
         const barsRow = segments.map(seg => {
           const info = calSourceInfo(seg.booking.source, seg.booking.is_blocked);
-          const label = info.label || `${seg.booking.guest_first_name || 'Guest'}${seg.booking.guests_count > 1 ? ' +' + (seg.booking.guests_count - 1) : ''}`;
-          const initial = (seg.booking.guest_first_name || info.label || '?').charAt(0).toUpperCase();
+          const label = info.label || `${escapeHtml(seg.booking.guest_first_name) || 'Guest'}${seg.booking.guests_count > 1 ? ' +' + (seg.booking.guests_count - 1) : ''}`;
+          const initial = escapeHtml((seg.booking.guest_first_name || info.label || '?').charAt(0).toUpperCase());
           return `<div class="cal-bar ${info.cls}" data-id="${seg.booking.id}" style="grid-column:${seg.start + 1} / ${seg.end + 1};">
             <span class="cal-avatar">${initial}</span><span>${label}</span>
           </div>`;
@@ -1416,7 +1432,7 @@
       const b = rows[0];
       banner.classList.remove('empty');
       const extra = b.guests_count > 1 ? ` +${b.guests_count - 1}` : '';
-      banner.innerHTML = `<div><div class="nbb-label">Next direct booking checks in</div><div class="nbb-main">${b.guest_first_name || 'Guest'}${extra} — ${humanCheckinCountdown(b.checkin)}</div></div>`;
+      banner.innerHTML = `<div><div class="nbb-label">Next direct booking checks in</div><div class="nbb-main">${escapeHtml(b.guest_first_name) || 'Guest'}${extra} — ${humanCheckinCountdown(b.checkin)}</div></div>`;
     }
 
     // ─── Edit / view booking modal ──────────────────────────────────
