@@ -656,6 +656,7 @@
               ${items.map(i => `<div class="fire-item-row"><span>${escapeHtml(i.n)}. ${escapeHtml(i.label)}</span><span class="ans ${i.answer === 'no' ? 'no' : 'yes'}">${escapeHtml((i.answer || '—').toUpperCase())}</span></div>`).join('')}
               ${actions.length > 0 ? `<div class="fire-actions-list"><strong>Actions:</strong><br>` + actions.map(a => `${escapeHtml(a.action)} — ${escapeHtml(a.by_whom || '?')} — ${escapeHtml(a.when || '?')}`).join('<br>') + `</div>` : ''}
               ${r.notes ? `<div class="fire-actions-list"><strong>Notes:</strong> ${escapeHtml(r.notes)}</div>` : ''}
+              ${r.changeover_comments ? `<div class="fire-actions-list" style="color:#b4503c;"><strong>Changeover comment (emailed):</strong> ${escapeHtml(r.changeover_comments)}</div>` : ''}
             </div>
           </details>`;
       }).join('');

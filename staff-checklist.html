@@ -113,6 +113,12 @@
         <textarea id="notes" rows="3" style="margin-bottom:0"></textarea>
       </div>
 
+      <div class="card" id="changeoverCard">
+        <label>Changeover comments (optional)</label>
+        <p style="font-size:0.82rem;color:var(--muted);margin-bottom:0.6rem;">Anything the owners should know from this changeover — e.g. more supplies needed, something not working. Leave blank if there's nothing to flag. Filling this in emails the owners; leaving it blank sends nothing.</p>
+        <textarea id="changeoverComments" rows="3" style="margin-bottom:0" placeholder="e.g. Running low on dishwasher tablets and bin bags"></textarea>
+      </div>
+
       <button type="submit" id="submitBtn">Submit Checklist</button>
     </form>
 
@@ -215,6 +221,16 @@
     // Default date to today
     document.getElementById('checkDate').value = new Date().toISOString().slice(0, 10);
 
+    // The changeover-comments field is only relevant when this submission
+    // actually is a change-of-occupancy check — hide it for daily/weekly/etc.
+    function toggleChangeoverCard() {
+      const isChangeover = document.getElementById('checkType').value === 'change_of_occupancy';
+      document.getElementById('changeoverCard').style.display = isChangeover ? 'block' : 'none';
+      if (!isChangeover) document.getElementById('changeoverComments').value = '';
+    }
+    document.getElementById('checkType').addEventListener('change', toggleChangeoverCard);
+    toggleChangeoverCard();
+
     function showMsg(text, ok) {
       const el = document.getElementById('msg');
       el.textContent = text;
@@ -248,24 +264,26 @@
         items,
         actions,
         notes: document.getElementById('notes').value.trim() || null,
+        changeover_comments: document.getElementById('changeoverComments').value.trim() || null,
       };
 
-      const res = await authFetch('/rest/v1/fire_checks', {
+      const res = await authFetch('/functions/v1/submit-fire-check', {
         method: 'POST',
-        headers: { 'Prefer': 'return=minimal' },
         body: JSON.stringify(payload),
       });
+      const data = res ? await res.json() : { ok: false };
 
       btn.disabled = false; btn.textContent = 'Submit Checklist';
 
-      if (res && res.ok) {
+      if (data.ok) {
         showMsg('Checklist submitted — thank you!', true);
         document.getElementById('checkForm').reset();
         document.getElementById('checkDate').value = new Date().toISOString().slice(0, 10);
         document.getElementById('actionsWrap').innerHTML = '';
+        toggleChangeoverCard();
         loadRecent();
       } else {
-        showMsg('Something went wrong submitting the checklist — please try again.', false);
+        showMsg(data.error || 'Something went wrong submitting the checklist — please try again.', false);
       }
     });
 
