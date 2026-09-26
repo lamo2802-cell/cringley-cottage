@@ -83,6 +83,7 @@
   #msg, .msg-box { display: none; padding: 0.7rem 1rem; border-radius: 2px; font-size: 0.85rem; margin-bottom: 1rem; }
   #msg.ok, .msg-box.ok { background: rgba(94,122,82,0.12); border: 1px solid rgba(94,122,82,0.3); color: #3d5233; }
   #msg.error, .msg-box.error { background: rgba(180,80,60,0.1); border: 1px solid rgba(180,80,60,0.3); color: #7a3325; }
+  .msg-box.warn { background: rgba(200,150,60,0.12); border: 1px solid rgba(200,150,60,0.35); color: #7a5c1e; }
   #loading { padding: 2rem 0; text-align: center; color: var(--muted); }
   .fire-card { background: #fff; border-radius: 4px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); margin-bottom: 0.8rem; overflow: hidden; }
   .review-card { background: #fff; border-radius: 4px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); margin-bottom: 0.7rem; padding: 0.9rem 1.2rem; display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; }
@@ -332,6 +333,7 @@
     <h2>Seasonal Rates</h2>
     <p class="sub">These prices drive the booking calendar and payment amounts live on the site — changes take effect immediately.</p>
     <div id="msg"></div>
+    <div id="rateGapsMsg" class="msg-box warn" style="display:none;"></div>
     <div id="loading">Loading rates…</div>
     <table id="ratesTable" style="display:none">
       <colgroup>
@@ -589,13 +591,114 @@
         </tr>`;
     }
 
+    // Kept in sync with the DB on every loadRates() call, and consulted
+    // whenever a rate band is added or edited so two bands can never
+    // silently overlap each other's dates.
+    let currentRates = [];
+
+    // Two inclusive date ranges (as 'YYYY-MM-DD' strings) overlap if either
+    // one starts before the other ends. String comparison works directly on
+    // ISO dates, so no Date parsing is needed here.
+    function rangesOverlap(fromA, toA, fromB, toB) {
+      return fromA <= toB && fromB <= toA;
+    }
+
+    function findOverlappingRate(dateFrom, dateTo, excludeId) {
+      return currentRates.find(r => r.id !== excludeId && rangesOverlap(dateFrom, dateTo, r.date_from, r.date_to));
+    }
+
+    function fmtGapDate(d) {
+      return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+    }
+    function fmtISODate(iso) {
+      return fmtGapDate(new Date(iso + 'T00:00:00'));
+    }
+
+    // Any bands already saved (from before this check existed, or added
+    // directly to the database) that overlap each other — the admin UI now
+    // blocks new overlaps at Add/Save, but pre-existing ones need surfacing
+    // too, since the site itself just uses whichever row it happens to
+    // match first.
+    function findOverlapPairs(rates) {
+      const pairs = [];
+      for (let i = 0; i < rates.length; i++) {
+        for (let j = i + 1; j < rates.length; j++) {
+          const a = rates[i], b = rates[j];
+          if (rangesOverlap(a.date_from, a.date_to, b.date_from, b.date_to)) pairs.push([a, b]);
+        }
+      }
+      return pairs;
+    }
+
+    // Any date between today and the latest date_to across all rate bands
+    // that isn't covered by any of them — a booking landing there would
+    // silently fall back to the site's hard-coded default rate.
+    function findRateGaps(rates) {
+      if (!rates.length) return { allPast: false, gaps: [] };
+      const today = new Date(); today.setHours(0, 0, 0, 0);
+      const maxTo = rates.reduce((max, r) => {
+        const d = new Date(r.date_to + 'T00:00:00');
+        return d > max ? d : max;
+      }, new Date(0));
+      if (maxTo < today) return { allPast: true, gaps: [] };
+
+      const intervals = rates
+        .map(r => ({ from: new Date(r.date_from + 'T00:00:00'), to: new Date(r.date_to + 'T00:00:00') }))
+        .sort((a, b) => a.from - b.from);
+
+      const gaps = [];
+      let cursor = new Date(today);
+      for (const iv of intervals) {
+        if (iv.to < cursor) continue; // fully in the past relative to cursor — irrelevant
+        if (iv.from > cursor) {
+          const gapEnd = new Date(iv.from);
+          gapEnd.setDate(gapEnd.getDate() - 1);
+          gaps.push({ from: new Date(cursor), to: gapEnd });
+        }
+        if (iv.to >= cursor) {
+          cursor = new Date(iv.to);
+          cursor.setDate(cursor.getDate() + 1);
+        }
+        if (cursor > maxTo) break;
+      }
+      if (cursor <= maxTo) gaps.push({ from: new Date(cursor), to: new Date(maxTo) });
+      return { allPast: false, gaps };
+    }
+
+    function renderRateGaps(rates) {
+      const el = document.getElementById('rateGapsMsg');
+      const messages = [];
+
+      const overlaps = findOverlapPairs(rates);
+      if (overlaps.length) {
+        const list = overlaps.map(([a, b]) =>
+          `"${a.label || 'Untitled'}" (${fmtISODate(a.date_from)}–${fmtISODate(a.date_to)}) overlaps "${b.label || 'Untitled'}" (${fmtISODate(b.date_from)}–${fmtISODate(b.date_to)})`
+        ).join('; ');
+        messages.push(`Overlapping rate bands — fix these so a date can't match two prices: ${list}.`);
+      }
+
+      const { allPast, gaps } = findRateGaps(rates);
+      if (allPast) {
+        messages.push('All of your rate bands are in the past — add one covering today onward so the calendar has a price.');
+      } else if (gaps.length) {
+        const list = gaps.map(g => `${fmtGapDate(g.from)} – ${fmtGapDate(g.to)}`).join(', ');
+        messages.push(`No rate band covers: ${list}. Bookings in ${gaps.length === 1 ? 'that range' : 'those ranges'} will fall back to the site's default rate.`);
+      }
+
+      if (!messages.length) { el.style.display = 'none'; return; }
+      el.textContent = messages.join(' ');
+      el.style.display = 'block';
+    }
+
     async function loadRates() {
       const res = await authFetch('/rest/v1/rates?select=*&order=date_from.asc');
       if (!res) return;
       const rows = await res.json();
+      currentRates = rows;
       document.getElementById('ratesBody').innerHTML = rows.map(rowHtml).join('');
       document.getElementById('loading').style.display = 'none';
       document.getElementById('ratesTable').style.display = 'table';
+      renderRateGaps(rows);
     }
 
     document.getElementById('ratesBody').addEventListener('click', async (e) => {
@@ -611,14 +714,17 @@
           nightly_rate: parseFloat(tr.querySelector('.f-rate').value),
           min_nights: parseInt(tr.querySelector('.f-min').value, 10),
         };
+        if (body.date_to < body.date_from) { showMsg('The "To" date must be on or after the "From" date.', false); return; }
+        const clash = findOverlappingRate(body.date_from, body.date_to, id);
+        if (clash) { showMsg(`Those dates overlap "${clash.label || 'another rate band'}" (${clash.date_from} to ${clash.date_to}).`, false); return; }
         const res = await authFetch(`/rest/v1/rates?id=eq.${id}`, { method: 'PATCH', body: JSON.stringify(body) });
-        if (res && res.ok) showMsg('Saved.', true); else showMsg('Save failed.', false);
+        if (res && res.ok) { showMsg('Saved.', true); loadRates(); } else showMsg('Save failed.', false);
       }
 
       if (e.target.classList.contains('deleteBtn')) {
         if (!confirm('Delete this rate band?')) return;
         const res = await authFetch(`/rest/v1/rates?id=eq.${id}`, { method: 'DELETE' });
-        if (res && res.ok) { tr.remove(); showMsg('Deleted.', true); } else showMsg('Delete failed.', false);
+        if (res && res.ok) { showMsg('Deleted.', true); loadRates(); } else showMsg('Delete failed.', false);
       }
     });
 
@@ -631,6 +737,9 @@
         min_nights: parseInt(document.getElementById('newMinNights').value, 10) || 2,
       };
       if (!body.date_from || !body.date_to || !body.nightly_rate) { showMsg('Fill in from, to, and £/night at least.', false); return; }
+      if (body.date_to < body.date_from) { showMsg('The "To" date must be on or after the "From" date.', false); return; }
+      const clash = findOverlappingRate(body.date_from, body.date_to, null);
+      if (clash) { showMsg(`Those dates overlap "${clash.label || 'another rate band'}" (${clash.date_from} to ${clash.date_to}).`, false); return; }
       const res = await authFetch('/rest/v1/rates', { method: 'POST', headers: { 'Prefer': 'return=representation' }, body: JSON.stringify(body) });
       if (res && res.ok) {
         showMsg('Added.', true);
