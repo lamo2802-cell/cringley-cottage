@@ -483,6 +483,9 @@
     <p class="sub">Create logins for staff or other owners — no need to touch Supabase.</p>
     <div id="staffMsg" style="display:none;"></div>
     <table id="staffTable" style="margin-bottom:1.2rem;">
+      <colgroup>
+        <col style="width:16%"><col style="width:30%"><col style="width:12%"><col style="width:16%"><col style="width:26%">
+      </colgroup>
       <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Last signed in</th><th></th></tr></thead>
       <tbody id="staffBody"><tr><td colspan="5" style="color:var(--muted)">Loading…</td></tr></tbody>
     </table>
@@ -805,10 +808,10 @@
       tbody.innerHTML = data.accounts.map(s => `
         <tr data-id="${s.id}">
           <td data-label="Name">${escapeHtml(s.display_name) || '—'}</td>
-          <td data-label="Email">${escapeHtml(s.email)}</td>
+          <td data-label="Email" style="word-break:break-all;">${escapeHtml(s.email)}</td>
           <td data-label="Role">${roleLabel(s.role)}</td>
           <td data-label="Last signed in">${s.last_sign_in_at ? new Date(s.last_sign_in_at).toLocaleDateString('en-GB') : 'Never'}</td>
-          <td class="row-actions">${s.is_self ? '<span style="color:var(--muted);font-size:0.78rem;">This is you</span>' : '<button class="danger deleteStaffBtn">Delete</button>'}</td>
+          <td class="row-actions">${s.is_self ? '<span style="color:var(--muted);font-size:0.78rem;">This is you</span>' : '<button class="resetPwBtn">Reset password</button> <button class="danger deleteStaffBtn">Delete</button>'}</td>
         </tr>`).join('');
     }
 
@@ -820,6 +823,19 @@
       const res = await authFetch('/functions/v1/delete-staff-account', { method: 'POST', body: JSON.stringify({ user_id: id }) });
       const data = res ? await res.json() : { ok: false };
       if (data.ok) { tr.remove(); showStaffMsg('Account deleted.', true); } else showStaffMsg(data.error || 'Delete failed.', false);
+    });
+
+    document.getElementById('staffBody').addEventListener('click', async (e) => {
+      if (!e.target.classList.contains('resetPwBtn')) return;
+      const tr = e.target.closest('tr');
+      const id = tr.dataset.id;
+      const newPassword = prompt('Enter a new password for this account (min. 8 characters). You will need to give it to them yourself.');
+      if (newPassword === null) return;
+      if (newPassword.length < 8) { showStaffMsg('Password must be at least 8 characters.', false); return; }
+      const res = await authFetch('/functions/v1/reset-staff-password', { method: 'POST', body: JSON.stringify({ user_id: id, new_password: newPassword }) });
+      const data = res ? await res.json() : { ok: false };
+      if (data.ok) showStaffMsg('Password reset. Give the new password to them directly.', true);
+      else showStaffMsg(data.error || 'Reset failed.', false);
     });
 
     document.getElementById('addStaffBtn').addEventListener('click', async () => {
