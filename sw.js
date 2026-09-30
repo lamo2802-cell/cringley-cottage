@@ -4,7 +4,7 @@
 // confusion we've already had with GitHub Pages, this service worker must
 // never be the reason someone gets stuck on a stale version of the site.
 
-const CACHE_NAME = 'cringley-cottage-v2';
+const CACHE_NAME = 'cringley-cottage-v3';
 const APP_SHELL = [
   './',
   './index.html',

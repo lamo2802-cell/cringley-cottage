@@ -21,7 +21,7 @@
 <meta property="og:type" content="website">
 <meta property="og:title" content="Cringley Cottage | Holiday Cottage in Askrigg, Yorkshire Dales">
 <meta property="og:description" content="Charming 2-bedroom cottage in Askrigg village. Log burning stove, private garden, dog friendly. Sleeps 4. Book direct.">
-<meta property="og:image" content="https://www.cringleycottage.com/413188738.jpg">
+<meta property="og:image" content="https://www.cringleycottage.com/front-of-house.jpg">
 <meta property="og:url" content="https://www.cringleycottage.com/">
 <meta property="og:site_name" content="Cringley Cottage">
 
@@ -29,7 +29,7 @@
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Cringley Cottage | Holiday Cottage in Askrigg, Yorkshire Dales">
 <meta name="twitter:description" content="Charming 2-bedroom cottage in Askrigg village. Log burning stove, private garden, dog friendly. Sleeps 4.">
-<meta name="twitter:image" content="https://www.cringleycottage.com/413188738.jpg">
+<meta name="twitter:image" content="https://www.cringleycottage.com/front-of-house.jpg">
 
 <!-- Schema.org structured data — tells Google this is a holiday rental -->
 <script type="application/ld+json">
@@ -40,6 +40,7 @@
   "description": "Charming 2-bedroom holiday cottage in Askrigg, heart of the Yorkshire Dales. Sleeps up to 4 guests. Features a log burning stove, private garden, and is dog friendly. Perfect for walking, cycling and exploring Wensleydale.",
   "url": "https://www.cringleycottage.com",
   "image": [
+    "https://www.cringleycottage.com/front-of-house.jpg",
     "https://www.cringleycottage.com/413188738.jpg",
     "https://www.cringleycottage.com/IMG_1423.jpg",
     "https://www.cringleycottage.com/garden.jpg"
@@ -155,7 +156,7 @@
     position: relative;
     display: flex; align-items: center;
     overflow: hidden;
-    background: url('IMG_1423.jpg') center/cover no-repeat;
+    background: url('front-of-house.jpg') center/cover no-repeat;
   }
   .hero-bg {
     position: absolute; inset: 0;
@@ -878,6 +879,12 @@
     .g-cell { grid-column: auto !important; grid-row: auto !important; aspect-ratio: 4/3; }
     nav { padding: 1rem 5%; }
     .nav-links { display: none; }
+    .nav-logo {
+      font-size: 1rem;
+      letter-spacing: 0.08em;
+      padding: 0.3rem 0.6rem;
+      margin-right: 0.75rem;
+    }
     .nav-manage-mobile {
       display: inline-block; color: var(--cream); text-decoration: none;
       font-size: 0.72rem; letter-spacing: 0.05em; text-transform: uppercase;
@@ -922,14 +929,14 @@
 
 <!-- HERO -->
 <section id="hero">
-  <video class="hero-bg" autoplay muted playsinline preload="none" poster="IMG_1423.jpg" id="heroVideo" width="1920" height="1080">
+  <video class="hero-bg" autoplay muted playsinline preload="none" poster="front-of-house.jpg" id="heroVideo" width="1920" height="1080">
     <source src="cottage-video.mp4" type="video/mp4">
   </video>
   <div class="hero-overlay"></div>
   <div class="hero-content">
     <span class="hero-tag">Askrigg · Yorkshire Dales</span>
     <h1 class="hero-title">Cringley<br><em>Cottage</em></h1>
-    <p class="hero-sub">Two bedrooms, an log burning stove, and a garden — in the heart of the Yorkshire Dales.</p>
+    <p class="hero-sub">Two bedrooms, a log burning stove, and a garden — in the heart of the Yorkshire Dales.</p>
     <div class="hero-actions">
       <a href="#availability" class="btn-primary">Check Availability</a>
       <a href="#about" class="btn-outline">Discover More</a>
@@ -1035,7 +1042,7 @@
   <div class="gallery-grid">
     <div class="g-cell" onclick="openLightbox(0)"><img src="IMG_1423.jpg"      alt="Cringley Cottage in winter snow"><div class="overlay"><span class="g-zoom">&#x2B26;</span></div></div>
     <div class="g-cell" onclick="openLightbox(1)"><img loading="lazy" src="413188738.jpg"     alt="Cringley Cottage exterior in summer"><div class="overlay"><span class="g-zoom">&#x2B26;</span></div></div>
-    <div class="g-cell" onclick="openLightbox(2)"><img loading="lazy" src="garden.jpg"        alt="Wensleydale views"><div class="overlay"><span class="g-zoom">&#x2B26;</span></div></div>
+    <div class="g-cell" onclick="openLightbox(2)"><img loading="lazy" src="garden.jpg"        alt="Aerial view of Askrigg village and the dale"><div class="overlay"><span class="g-zoom">&#x2B26;</span></div></div>
     <div class="g-cell" onclick="openLightbox(3)"><img loading="lazy" src="416725514.jpg"     alt="Dining room and log burning stove"><div class="overlay"><span class="g-zoom">&#x2B26;</span></div></div>
     <div class="g-cell" onclick="openLightbox(4)"><img loading="lazy" src="416725784.jpg"     alt="Living room with beamed ceiling"><div class="overlay"><span class="g-zoom">&#x2B26;</span></div></div>
     <div class="g-cell" onclick="openLightbox(5)"><img loading="lazy" src="416724818.jpg"     alt="Dining table under the beams"><div class="overlay"><span class="g-zoom">&#x2B26;</span></div></div>
@@ -2180,7 +2187,7 @@
   const LB_IMAGES = [
     { src: 'IMG_1423.jpg',      caption: 'Cringley Cottage in winter' },
     { src: '413188738.jpg',     caption: 'Exterior — summer' },
-    { src: 'garden.jpg',        caption: 'Wensleydale views' },
+    { src: 'garden.jpg',        caption: 'Askrigg village from above' },
     { src: '416725514.jpg',     caption: 'Dining room & log burning stove' },
     { src: '416725784.jpg',     caption: 'Living room' },
     { src: '416724818.jpg',     caption: 'Dining table under the beams' },
