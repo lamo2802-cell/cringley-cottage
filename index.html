@@ -2321,16 +2321,16 @@
   loadReviews();
   setInterval(nextReview, 6000);
 
-  // ─── VIDEO: play once then fade to snow image ───────────────────
+  // ─── VIDEO: play once then fade to hero image ───────────────────
   (function() {
     const video = document.getElementById('heroVideo');
     if (!video) return;
     video.addEventListener('ended', () => {
-      // Hold on last frame for 2s, then fade to snow poster and stay
+      // Hold on last frame for 2s, then fade to the hero poster and stay
       setTimeout(() => {
         video.style.transition = 'opacity 1.5s ease';
         video.style.opacity = '0';
-        // video stays hidden, snow image (hero background) shows permanently
+        // video stays hidden, hero background image shows permanently
       }, 2000);
     });
   })();
@@ -2338,15 +2338,14 @@
   // ─── FLOATING BOOK NOW BUTTON ───────────────────────────────────
   (() => {
     const btn = document.getElementById('floatBookBtn');
-    const hero = document.getElementById('hero');
     const avail = document.getElementById('availability');
-    if (!btn || !hero || !avail) return;
-    let pastHero = false, onAvailability = false;
-    const update = () => { btn.classList.toggle('visible', pastHero && !onAvailability); };
-    new IntersectionObserver((entries) => {
-      entries.forEach(e => { if (e.target === hero) pastHero = !e.isIntersecting; });
-      update();
-    }, { threshold: 0 }).observe(hero);
+    if (!btn || !avail) return;
+    // Visible from the moment the page loads — only hide it once the
+    // availability/booking widget itself is on screen, since the button
+    // would just be duplicating it there.
+    let onAvailability = false;
+    const update = () => { btn.classList.toggle('visible', !onAvailability); };
+    update();
     new IntersectionObserver((entries) => {
       entries.forEach(e => { if (e.target === avail) onAvailability = e.isIntersecting; });
       update();
