@@ -1496,6 +1496,25 @@
       setTimeout(() => { el.style.display = 'none'; }, 5000);
     }
 
+    // Timestamps are stored in UTC. Exports show them as UK clock time
+    // (GMT or BST, whichever applied then), so a payment at 00:30 BST lands
+    // on the right day.
+    function ukDate(ts) {
+      if (!ts) return '';
+      const p = Object.fromEntries(new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/London', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date(ts)).map(x => [x.type, x.value]));
+      return `${p.year}-${p.month}-${p.day}`;
+    }
+    function ukDateTime(ts) {
+      if (!ts) return '';
+      const p = Object.fromEntries(new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/London', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }).formatToParts(new Date(ts)).map(x => [x.type, x.value]));
+      return `${p.year}-${p.month}-${p.day} ${p.hour === '24' ? '00' : p.hour}:${p.minute}`;
+    }
+    function shiftDate(dateStr, days) {
+      const d = new Date(dateStr + 'T12:00:00Z');
+      d.setUTCDate(d.getUTCDate() + days);
+      return d.toISOString().slice(0, 10);
+    }
+
     function csvField(v) {
       let s = (v ?? '').toString();
       // Guest names/emails are free text from the public booking form. If a
@@ -1518,13 +1537,13 @@
       if (unique.length === 0) { showMailingListMsg('No guests have opted in yet.', true); return; }
       const csvRows = [['First Name', 'Last Name', 'Email', 'Consented At'].join(',')];
       for (const r of unique) {
-        csvRows.push([csvField(r.guest_first_name), csvField(r.guest_last_name), csvField(r.guest_email), csvField(r.marketing_consent_at)].join(','));
+        csvRows.push([csvField(r.guest_first_name), csvField(r.guest_last_name), csvField(r.guest_email), csvField(ukDateTime(r.marketing_consent_at))].join(','));
       }
       const blob = new Blob([csvRows.join('\n')], { type: 'text/csv;charset=utf-8;' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `cringley-cottage-mailing-list-${new Date().toISOString().slice(0, 10)}.csv`;
+      a.download = `cringley-cottage-mailing-list-${ukDate(new Date())}.csv`;
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -1541,16 +1560,18 @@
       const from = document.getElementById('reportFrom').value;
       const to = document.getElementById('reportTo').value;
       if (!from || !to) { showReportMsg('Choose a From and To date first.', false); return; }
-      const res = await authFetch(`/rest/v1/booking_payments?select=created_at,amount,purpose,stripe_payment_intent_id,bookings(booking_ref,guest_first_name,guest_last_name,checkin,checkout,payment_type,total_amount)&created_at=gte.${from}T00:00:00Z&created_at=lte.${to}T23:59:59Z&order=created_at.asc`);
+      const res = await authFetch(`/rest/v1/booking_payments?select=created_at,amount,purpose,stripe_payment_intent_id,bookings(booking_ref,guest_first_name,guest_last_name,checkin,checkout,payment_type,total_amount)&created_at=gte.${shiftDate(from, -1)}T00:00:00Z&created_at=lte.${shiftDate(to, 1)}T23:59:59Z&order=created_at.asc`);
       if (!res || !res.ok) { showReportMsg('Could not load payments.', false); return; }
-      const rows = await res.json();
+      // Fetched a day either side, then kept by UK date, so the From/To
+      // days mean UK days rather than UTC ones.
+      const rows = (await res.json()).filter(r => { const d = ukDate(r.created_at); return d >= from && d <= to; });
       if (rows.length === 0) { showReportMsg('No Stripe payments in that date range.', true); return; }
       const csvRows = [['Payment Date', 'Booking Ref', 'Guest', 'Check-in', 'Check-out', 'Payment', 'Amount', 'Booking Total', 'Stripe Payment ID'].join(',')];
       for (const r of rows) {
         const b = r.bookings || {};
         const kind = r.purpose === 'refund' ? 'Refund' : r.purpose === 'balance' ? 'Balance' : (b.payment_type === 'full' ? 'Full payment' : 'Deposit');
         csvRows.push([
-          csvField(r.created_at.slice(0, 10)), csvField(b.booking_ref), csvField(`${b.guest_first_name || ''} ${b.guest_last_name || ''}`.trim()),
+          csvField(ukDate(r.created_at)), csvField(b.booking_ref), csvField(`${b.guest_first_name || ''} ${b.guest_last_name || ''}`.trim()),
           csvField(b.checkin), csvField(b.checkout), csvField(kind), csvField(Number(r.amount).toFixed(2)),
           csvField(b.total_amount != null ? Number(b.total_amount).toFixed(2) : ''), csvField(r.stripe_payment_intent_id),
         ].join(','));

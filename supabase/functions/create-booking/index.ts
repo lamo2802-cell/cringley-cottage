@@ -109,10 +109,16 @@ function guestBreakdown(adults: number, children: number): string {
 }
 function money(n: number) { return "£" + Number(n).toFixed(2).replace(/\.00$/, ""); }
 function fmtDate(d: string) { return new Date(d + "T00:00:00").toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" }); }
+// Throws rather than returning "CC-YYYY-null" if the sequence call fails;
+// the caller's catch turns that into a 500 before anything is confirmed.
 async function nextBookingRef(supabase: any) {
-  const { data } = await supabase.rpc("nextval_booking_ref");
+  const { data, error } = await supabase.rpc("nextval_booking_ref");
+  const n = Number(data);
+  if (error || data === null || data === undefined || !Number.isFinite(n) || n <= 0) {
+    throw new Error(`Couldn't assign a booking reference: ${error?.message ?? "no value returned"}`);
+  }
   const year = new Date().getFullYear();
-  return `CC-${year}-${String(data as number).padStart(4, "0")}`;
+  return `CC-${year}-${String(n).padStart(4, "0")}`;
 }
 // Guest-supplied fields (name, phone, discount code echoed back) reach this
 // file straight from the public booking form — escape them before they go
@@ -295,15 +301,16 @@ Deno.serve(async (req: Request) => {
     };
 
     if (fullyDiscounted) {
-      // Skip Stripe entirely — confirm right now. The code's use is claimed
-      // first, in one step, so two guests can't both take its last use.
+      // Skip Stripe entirely — confirm right now. The reference is assigned
+      // before the code's use is claimed, so a failure there can't use it up.
+      // The claim is one step, so two guests can't both take its last use.
+      const bookingRef = await nextBookingRef(supabase);
       if (discountRow) {
         const { data: claimed } = await supabase.rpc("claim_discount_use", { p_code: discountRow.code });
         if (claimed !== true) {
           return new Response(JSON.stringify({ ok: false, error: "That discount code is no longer valid" }), { status: 400, headers: { ...CORS_HEADERS, "Content-Type": "application/json" } });
         }
       }
-      const bookingRef = await nextBookingRef(supabase);
       baseUpdates.status = "confirmed";
       baseUpdates.deposit_paid = true;
       baseUpdates.amount_paid = pricing.totalAmount; // 0, but keeps amount_paid === total_amount invariant
@@ -322,7 +329,14 @@ Deno.serve(async (req: Request) => {
           infoRow("Dates", `${fmtDate(finalCheckin)} &rarr; ${fmtDate(finalCheckout)}`) +
           infoRow("Discount code", escapeHtml(baseUpdates.discount_code as string), true)
         ) +
-        para(`We look forward to welcoming you to Cringley Cottage! Check-in is from <strong>3pm</strong>.`) +
+        infoBox(
+          infoRow("Check-in", "From 3pm") +
+          infoRow("Check-out", "By 10am") +
+          infoRow("Address", "Cringley Cottage, Silver Street,<br>Askrigg, Leyburn DL8 3HS") +
+          infoRow("Parking", "On-street in the village, or Parkins Garth car park at the village entrance")
+        ) +
+        para(`Your booking is made under our <a href="${SITE_BASE_URL}terms.html" style="color:#5e7a52;">booking terms</a>. We'll email your key-safe code on the morning you arrive.`) +
+        para("We look forward to welcoming you to Cringley Cottage!") +
         button("View guest information", guestInfoUrl)
       ));
       await sendEmail(OWNER_EMAILS, `New confirmed booking ${bookingRef} (100% discount)`, emailShell(

@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<meta name="referrer" content="no-referrer">
+<title>Unsubscribe — Cringley Cottage</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --ink: #232120; --cream: #f3ede3; --stone: #dfd8cb;
+    --sage: #5e7a52; --sage-light: #84a472; --muted: #7a6f60;
+  }
+  body {
+    font-family: 'DM Sans', sans-serif; background: var(--ink); color: var(--cream);
+    min-height: 100vh; display: flex; align-items: center; justify-content: center;
+    padding: 2.5rem 6%; line-height: 1.7;
+  }
+  .box { width: 100%; max-width: 420px; text-align: center; }
+  h1 { font-family: 'Cormorant Garamond', serif; font-weight: 600; font-size: 1.8rem; margin-bottom: 0.3rem; }
+  p.sub { color: rgba(247,242,234,0.6); font-size: 0.9rem; margin-bottom: 2rem; }
+  button {
+    width: 100%; background: var(--sage); color: var(--cream); border: none;
+    padding: 0.85rem; font-size: 0.8rem; letter-spacing: 0.08em; text-transform: uppercase;
+    border-radius: 2px; cursor: pointer;
+  }
+  button:hover { background: var(--sage-light); }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+  #err, #done {
+    display: none; font-size: 0.88rem; padding: 0.9rem 1rem; border-radius: 2px; margin-bottom: 1.1rem; text-align: left;
+  }
+  #err { background: rgba(180,80,60,0.15); border: 1px solid rgba(180,80,60,0.35); }
+  #done { background: rgba(94,122,82,0.15); border: 1px solid rgba(94,122,82,0.35); }
+  a.back { display: block; text-align: center; margin-top: 1.5rem; color: rgba(247,242,234,0.4); font-size: 0.78rem; text-decoration: none; }
+</style>
+</head>
+<body>
+  <div class="box">
+    <h1>Unsubscribe</h1>
+    <p class="sub" id="sub">Stop receiving offers and news from Cringley Cottage. Emails about a booking you've made will still arrive.</p>
+
+    <div id="err" role="alert"></div>
+    <div id="done" role="status">You're unsubscribed. You won't get any more offer emails from us. Thank you for staying with us.</div>
+
+    <button id="unsubBtn" type="button">Unsubscribe me</button>
+
+    <a href="index.html" class="back">&#8592; Back to site</a>
+  </div>
+
+  <script>
+    const SUPABASE_URL = 'https://yfeyswuxhgezkpcjhznp.supabase.co';
+    const token = new URLSearchParams(window.location.search).get('t');
+    const btn = document.getElementById('unsubBtn');
+    const err = document.getElementById('err');
+
+    function showErr(msg) { err.textContent = msg; err.style.display = 'block'; }
+
+    if (!token) {
+      btn.style.display = 'none';
+      showErr("This link is missing its code. Please use the link in the email, or reply to any of our emails and we'll remove you.");
+    }
+
+    // Unsubscribing needs a click, so email scanners that open the link
+    // to check it can't unsubscribe anyone by accident.
+    btn.addEventListener('click', async () => {
+      btn.disabled = true; btn.textContent = 'Unsubscribing…';
+      err.style.display = 'none';
+      try {
+        const res = await fetch(`${SUPABASE_URL}/functions/v1/unsubscribe`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ t: token }),
+        });
+        const data = await res.json();
+        if (data.ok) {
+          btn.style.display = 'none';
+          document.getElementById('sub').style.display = 'none';
+          document.getElementById('done').style.display = 'block';
+        } else {
+          showErr(data.error || 'Something went wrong. Please try again.');
+          btn.disabled = false; btn.textContent = 'Unsubscribe me';
+        }
+      } catch (e) {
+        showErr('Something went wrong. Please try again.');
+        btn.disabled = false; btn.textContent = 'Unsubscribe me';
+      }
+    });
+  </script>
+</body>
+</html>

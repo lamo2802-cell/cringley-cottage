@@ -116,6 +116,17 @@
       document.getElementById('err').style.display = 'none';
     }
 
+    // Links in our emails carry the booking reference (?ref=CC-2027-0001) so
+    // the guest only has to type their email. The email is never put in the
+    // link, so it can't end up in browser history or server logs.
+    (function prefillRef() {
+      const ref = new URLSearchParams(window.location.search).get('ref');
+      if (ref && /^CC-\d{4}-\d{1,6}$/i.test(ref.trim())) {
+        document.getElementById('bookingRef').value = ref.trim().toUpperCase();
+        document.getElementById('email').focus();
+      }
+    })();
+
     document.getElementById('lookupForm').addEventListener('submit', async (e) => {
       e.preventDefault();
       document.getElementById('err').style.display = 'none';
