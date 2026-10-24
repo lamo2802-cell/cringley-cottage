@@ -4,7 +4,7 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
 // Pulls every owner-managed iCal feed (Airbnb, Booking.com, or anything else
 // added in admin.html) into the bookings table. Triggered on schedule
 // (x-sync-secret, set by pg_cron) or manually from the admin page (a valid
-// owner JWT in Authorization).
+// owner JWT in Authorization, from a session that has passed 2FA).
 //
 // Airbnb (and some other platforms) reissue a fresh UID for a placeholder
 // "not available" block each time it re-derives one — the same conceptual
@@ -133,6 +133,16 @@ async function syncSource(supabase: any, src: any): Promise<string | number> {
   return count ? `${rows.length} synced, ${count} stale removed` : rows.length;
 }
 
+// True when the session has passed the authenticator-code step (aal2), not
+// just the password. Only read after getUser() has accepted the token.
+function passedTwoFactor(token: string): boolean {
+  try {
+    return JSON.parse(atob(token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/"))).aal === "aal2";
+  } catch {
+    return false;
+  }
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: CORS_HEADERS });
 
@@ -146,7 +156,7 @@ Deno.serve(async (req: Request) => {
     if (callerToken) {
       const callerClient = createClient(SUPABASE_URL, ANON_KEY, { global: { headers: { Authorization: `Bearer ${callerToken}` } } });
       const { data: callerData } = await callerClient.auth.getUser();
-      authorized = callerData?.user?.app_metadata?.role === "owner";
+      authorized = callerData?.user?.app_metadata?.role === "owner" && passedTwoFactor(callerToken);
     }
   }
   if (!authorized) {
