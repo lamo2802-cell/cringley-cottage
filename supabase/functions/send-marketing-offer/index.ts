@@ -77,6 +77,16 @@ async function sendEmail(to: string, subject: string, html: string) {
   } catch { /* best-effort */ }
 }
 
+// True when the session has passed the authenticator-code step (aal2), not
+// just the password. Only read after getUser() has accepted the token.
+function passedTwoFactor(token: string): boolean {
+  try {
+    return JSON.parse(atob(token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/"))).aal === "aal2";
+  } catch {
+    return false;
+  }
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: CORS_HEADERS });
   if (req.method !== "POST") {
@@ -91,7 +101,7 @@ Deno.serve(async (req: Request) => {
     }
     const callerClient = createClient(SUPABASE_URL, ANON_KEY, { global: { headers: { Authorization: `Bearer ${callerToken}` } } });
     const { data: callerData, error: callerErr } = await callerClient.auth.getUser();
-    if (callerErr || !callerData?.user || callerData.user.app_metadata?.role !== "owner") {
+    if (callerErr || !callerData?.user || callerData.user.app_metadata?.role !== "owner" || !passedTwoFactor(callerToken)) {
       return new Response(JSON.stringify({ ok: false, error: "Only an owner account can send offers" }), { status: 403, headers: { ...CORS_HEADERS, "Content-Type": "application/json" } });
     }
 

@@ -64,7 +64,7 @@
       <a href="#" id="useBackupLink" class="back" style="margin-top:1rem;">Use a backup code instead</a>
     </form>
     <form id="backupForm" style="display:none;">
-      <p class="sub" style="margin-bottom:1.4rem;">Enter one of your one-time backup codes.</p>
+      <p class="sub" style="margin-bottom:1.4rem;">Enter one of your one-time backup codes. This removes your old authenticator, and you'll set up 2FA on your new phone straight after.</p>
       <label>Backup code</label>
       <input type="text" id="backupCode" autocomplete="off" placeholder="XXXX-XXXX">
       <button type="submit" id="backupSubmitBtn">Verify</button>
@@ -190,7 +190,17 @@
         });
         const data = await res.json();
         if (!data.ok) { showErr(data.error || 'Invalid backup code.'); btn.disabled = false; btn.textContent = 'Verify'; return; }
-        finishLogin(pending.access_token, pending.refresh_token, pending.expires_in, pending.role, pending.user_id);
+        // The code has removed the lost authenticator, so sign in again with
+        // the password for a fresh session; the admin page then asks for 2FA
+        // to be set up on the new phone before anything else.
+        const again = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY },
+          body: JSON.stringify({ email: document.getElementById('email').value.trim(), password: document.getElementById('password').value }),
+        });
+        const fresh = await again.json();
+        if (!again.ok) { showErr('Backup code accepted. Please sign in again with your password.'); setTimeout(() => window.location.reload(), 2500); return; }
+        finishLogin(fresh.access_token, fresh.refresh_token, fresh.expires_in, fresh.user?.app_metadata?.role || pending.role, fresh.user?.id || pending.user_id);
       } catch (e) {
         showErr('Something went wrong — please try again.');
         btn.disabled = false; btn.textContent = 'Verify';
