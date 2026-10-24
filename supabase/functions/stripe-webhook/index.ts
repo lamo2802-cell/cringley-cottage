@@ -3,9 +3,10 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
 
 // Stripe webhook — the authoritative source for "did this actually get paid".
 // Handles both the initial (deposit/full) payment and later balance payments.
-// Sends the guest a branded confirmation email and Mark/Ruth an owner
-// notification, both via Resend. If a discount code was used, increments its
-// usage count here — only on a real completed payment, not an abandoned hold.
+// The payment and booking update happen in the record_stripe_payment
+// database function (one transaction, which also re-checks the dates are
+// still free and counts discount-code usage). Then sends the guest a branded
+// confirmation email and Mark/Ruth an owner notification, both via Resend.
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -15,32 +16,32 @@ const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
 const FROM_EMAIL = "Cringley Cottage <hello@cringleycottage.com>";
 const OWNER_EMAILS = ["lamo2802@gmail.com", "rpeacey987@gmail.com"];
 const SITE_BASE_URL = "https://www.cringleycottage.com/";
+// If a payment lands on dates someone else has taken, refund it straight
+// away (true) or leave it for the owners to refund by hand (false). The
+// owners are emailed either way.
+const AUTO_REFUND_ON_CLASH = true;
+
+// Stripe's own libraries reject signatures more than 5 minutes old, so a
+// captured webhook can't be replayed later. A header can carry several v1
+// signatures while the signing secret is being rotated — any one may match.
+const SIGNATURE_TOLERANCE_SECONDS = 300;
 
 async function verifyStripeSignature(payload: string, sigHeader: string, secret: string): Promise<boolean> {
-  const parts = Object.fromEntries(sigHeader.split(",").map(p => p.split("=")) as [string, string][]);
-  const timestamp = parts["t"];
-  const signature = parts["v1"];
-  if (!timestamp || !signature) return false;
+  const pairs = sigHeader.split(",").map(p => p.split("=") as [string, string]);
+  const timestamp = pairs.find(([k]) => k === "t")?.[1];
+  const signatures = pairs.filter(([k]) => k === "v1").map(([, v]) => v);
+  if (!timestamp || signatures.length === 0) return false;
+  if (Math.abs(Date.now() / 1000 - Number(timestamp)) > SIGNATURE_TOLERANCE_SECONDS) return false;
   const signedPayload = `${timestamp}.${payload}`;
   const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
   const sigBytes = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(signedPayload));
   const computed = Array.from(new Uint8Array(sigBytes)).map(b => b.toString(16).padStart(2, "0")).join("");
-  if (computed.length !== signature.length) return false;
-  let diff = 0;
-  for (let i = 0; i < computed.length; i++) diff |= computed.charCodeAt(i) ^ signature.charCodeAt(i);
-  return diff === 0;
-}
-
-async function nextBookingRef(supabase: any): Promise<string> {
-  const { data } = await supabase.rpc("nextval_booking_ref");
-  const n = data as number;
-  const year = new Date().getFullYear();
-  return `CC-${year}-${String(n).padStart(4, "0")}`;
-}
-
-async function getFullPaymentWindowDays(supabase: any): Promise<number> {
-  const { data } = await supabase.from("site_settings").select("full_payment_window_days").eq("id", 1).maybeSingle();
-  return data?.full_payment_window_days ?? 14;
+  return signatures.some(signature => {
+    if (computed.length !== signature.length) return false;
+    let diff = 0;
+    for (let i = 0; i < computed.length; i++) diff |= computed.charCodeAt(i) ^ signature.charCodeAt(i);
+    return diff === 0;
+  });
 }
 
 function money(n: number): string { return "£" + Number(n).toFixed(2).replace(/\.00$/, ""); }
@@ -116,15 +117,58 @@ async function tagStripePayment(paymentIntentId: string, ref: string, descriptio
   } catch { /* best-effort */ }
 }
 
-async function sendEmail(to: string | string[], subject: string, html: string) {
-  if (!RESEND_API_KEY) return;
+// Email failures used to vanish silently. Each send is now recorded in
+// email_log (admin shows the failures), and the result is returned so the
+// caller can react. Never throws.
+const emailLogDb = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
+async function sendEmail(to: string | string[], subject: string, html: string, bookingId?: string): Promise<boolean> {
+  let ok = false;
+  let error: string | null = null;
+  if (!RESEND_API_KEY) {
+    error = "RESEND_API_KEY not set";
+  } else {
+    try {
+      const res = await fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${RESEND_API_KEY}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ from: FROM_EMAIL, to, subject, html }),
+      });
+      ok = res.ok;
+      if (!ok) error = `Resend ${res.status}: ${(await res.text()).slice(0, 500)}`;
+    } catch (e) {
+      error = String(e);
+    }
+  }
+  await emailLogDb.from("email_log").insert({
+    function_name: "stripe-webhook", recipient: [to].flat().join(", "), subject, ok, error, booking_id: bookingId ?? null,
+  });
+  return ok;
+}
+
+// The guest paid for dates that were taken while they were on the Stripe
+// page. Money back automatically, using the payment id as the idempotency
+// key so a retried webhook can never refund twice.
+async function refundPayment(paymentIntentId: string): Promise<{ ok: boolean; id?: string; error?: string }> {
+  if (!STRIPE_SECRET_KEY || !paymentIntentId.startsWith("pi_")) return { ok: false, error: "No Stripe payment to refund" };
   try {
-    await fetch("https://api.resend.com/emails", {
+    const res = await fetch("https://api.stripe.com/v1/refunds", {
       method: "POST",
-      headers: { "Authorization": `Bearer ${RESEND_API_KEY}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ from: FROM_EMAIL, to, subject, html }),
+      headers: {
+        "Authorization": `Bearer ${STRIPE_SECRET_KEY}`,
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Idempotency-Key": `clash-refund-${paymentIntentId}`,
+      },
+      body: new URLSearchParams({ payment_intent: paymentIntentId, reason: "requested_by_customer" }),
     });
-  } catch { /* email is best-effort — never blocks booking confirmation */ }
+    const data = await res.json();
+    return res.ok ? { ok: true, id: data.id } : { ok: false, error: data?.error?.message || `Stripe ${res.status}` };
+  } catch (e) {
+    return { ok: false, error: String(e) };
+  }
+}
+
+function json(body: unknown, status = 200): Response {
+  return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
 }
 
 Deno.serve(async (req: Request) => {
@@ -142,130 +186,152 @@ Deno.serve(async (req: Request) => {
 
   const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
 
-  if (event.type === "checkout.session.completed" || event.type === "checkout.session.async_payment_succeeded") {
+  // The guest left the Stripe page open until it expired without paying:
+  // give their dates back now rather than waiting for the hold to run out.
+  if (event.type === "checkout.session.expired") {
     const session = event.data.object;
     const bookingId = session?.metadata?.booking_id;
-    const purpose = session?.metadata?.purpose === "balance" ? "balance" : "initial";
-    const paymentIntentId = session.payment_intent || session.id;
-
-    if (bookingId && session.payment_status === "paid") {
-      const { data: existing } = await supabase
-        .from("booking_payments")
-        .select("id")
-        .eq("stripe_payment_intent_id", paymentIntentId)
-        .maybeSingle();
-
-      if (!existing) {
-        const { data: booking } = await supabase.from("bookings").select("*").eq("id", bookingId).maybeSingle();
-        if (booking) {
-          const paidAmount = (session.amount_total || 0) / 100;
-
-          await supabase.from("booking_payments").insert({
-            booking_id: bookingId,
-            stripe_payment_intent_id: paymentIntentId,
-            stripe_checkout_session_id: session.id,
-            amount: paidAmount,
-            purpose,
-          });
-
-          const newAmountPaid = Math.round(((booking.amount_paid || 0) + paidAmount) * 100) / 100;
-          const updates: Record<string, unknown> = { amount_paid: newAmountPaid };
-
-          if (purpose === "initial") {
-            updates.status = "confirmed";
-            updates.deposit_paid = true;
-            updates.stripe_payment_intent_id = paymentIntentId;
-            // Payment has genuinely landed — this booking must block these
-            // dates permanently, not just until its checkout-window hold
-            // (set by create-booking) happens to expire. Null it out here,
-            // same as the fully-discounted no-Stripe path already does.
-            updates.hold_expires_at = null;
-            if (!booking.booking_ref) updates.booking_ref = await nextBookingRef(supabase);
-            if (booking.payment_type === "deposit") {
-              const windowDays = await getFullPaymentWindowDays(supabase);
-              const checkin = new Date(booking.checkin + "T00:00:00");
-              checkin.setDate(checkin.getDate() - windowDays);
-              updates.balance_due_date = checkin.toISOString().slice(0, 10);
-            }
-            // A discount code was applied at booking time but payment still went
-            // through Stripe (partial discount) — usage only counts once payment
-            // actually completes, not when the hold was merely created.
-            if (booking.discount_code) {
-              const { data: codeRow } = await supabase.from("discount_codes").select("id, times_used").eq("code", booking.discount_code).maybeSingle();
-              if (codeRow) await supabase.from("discount_codes").update({ times_used: codeRow.times_used + 1 }).eq("id", codeRow.id);
-            }
-          } else {
-            if (newAmountPaid >= (booking.total_amount || 0) - 0.01) updates.balance_due_date = null;
-          }
-
-          await supabase.from("bookings").update(updates).eq("id", bookingId);
-
-          const ref = (updates.booking_ref as string) || booking.booking_ref;
-          const paymentKind = purpose === "balance" ? "Balance" : (booking.payment_type === "full" ? "Full payment" : "Deposit");
-          if (ref) await tagStripePayment(paymentIntentId, ref, `${paymentKind} — Cringley Cottage ${ref}, ${booking.checkin} to ${booking.checkout}`);
-          const outstanding = Math.max(0, Math.round(((booking.total_amount || 0) - newAmountPaid) * 100) / 100);
-          const manageUrl = `${SITE_BASE_URL}pay-balance.html`;
-          const guestInfoUrl = `${SITE_BASE_URL}guest-info.html`;
-
-          if (booking.guest_email) {
-            let guestHtml: string;
-            let subject: string;
-            if (purpose === "initial") {
-              subject = `Booking Confirmed — ${ref}`;
-              let rows = infoRow("Booking reference", escapeHtml(ref), true)
-                + infoRow("Dates", `${fmtDate(booking.checkin)} &rarr; ${fmtDate(booking.checkout)}`)
-                + (booking.discount_amount > 0 ? infoRow("Discount applied", `${money(booking.discount_amount)} (${escapeHtml(booking.discount_code)})`) : "")
-                + infoRow("Total cost", money(booking.total_amount))
-                + infoRow("Paid today", money(paidAmount));
-              if (outstanding > 0) rows += infoRow("Balance due", `${money(outstanding)} by ${fmtDate((updates.balance_due_date as string) || booking.balance_due_date)}`, true);
-              guestHtml = emailShell(
-                heading("Booking confirmed") +
-                para(`Dear ${escapeHtml(booking.guest_first_name) || "there"},`) +
-                para("Thank you — your booking at Cringley Cottage is confirmed!") +
-                infoBox(rows) +
-                (outstanding > 0
-                  ? para(`You can pay the remaining balance any time before then at <a href="${manageUrl}" style="color:#5e7a52;">${manageUrl}</a> using your booking reference and email.`)
-                  : para("Your stay is paid in full — nothing more to do!")) +
-                para(`We look forward to welcoming you to Cringley Cottage! Check-in is from <strong>3pm</strong>.`) +
-                button("View guest information", guestInfoUrl)
-              );
-            } else {
-              subject = `Balance Paid — ${ref}`;
-              guestHtml = emailShell(
-                heading("Balance received") +
-                para(`Dear ${escapeHtml(booking.guest_first_name) || "there"},`) +
-                para(`Thank you — we've received your balance payment of <strong>${money(paidAmount)}</strong>. Your booking is now paid in full.`) +
-                infoBox(infoRow("Booking reference", escapeHtml(ref), true) + infoRow("Status", "Paid in full", true)) +
-                para(`We look forward to welcoming you to Cringley Cottage! Check-in is from <strong>3pm</strong>.`) +
-                button("View guest information", guestInfoUrl)
-              );
-            }
-            await sendEmail(booking.guest_email, subject, guestHtml);
-          }
-
-          const ownerRows = infoRow("Guest", `${escapeHtml(booking.guest_first_name)} ${escapeHtml(booking.guest_last_name)}`)
-            + infoRow("Email", escapeHtml(booking.guest_email))
-            + infoRow("Phone", escapeHtml(booking.guest_phone))
-            + infoRow("Dates", `${fmtDate(booking.checkin)} &rarr; ${fmtDate(booking.checkout)}`)
-            + infoRow("Guests", String(booking.guests_count || ""))
-            + infoRow("Dog", booking.has_dog ? "Yes" : "No")
-            + infoRow("Address", escapeHtml([booking.address_line1, booking.address_line2, booking.city, booking.postcode, booking.country].filter(Boolean).join(", ")))
-            + (booking.discount_amount > 0 ? infoRow("Discount code", `${escapeHtml(booking.discount_code)} (${money(booking.discount_amount)} off)`) : "")
-            + infoRow("Payment just made", `${money(paidAmount)} (${paymentKind})`)
-            + infoRow("Stripe payment ID", escapeHtml(paymentIntentId))
-            + infoRow("Total paid so far", money(newAmountPaid))
-            + infoRow("Total cost", money(booking.total_amount), true)
-            + (booking.message ? infoRow("Message", escapeHtml(booking.message)) : "");
-          const ownerHtml = emailShell(
-            heading(purpose === "initial" ? "New confirmed booking" : "Balance paid") +
-            para(`Booking reference <strong>${escapeHtml(ref)}</strong>`) +
-            infoBox(ownerRows)
-          );
-          await sendEmail(OWNER_EMAILS, purpose === "initial" ? `New confirmed booking ${ref}` : `Balance paid for ${ref}`, ownerHtml);
-        }
-      }
+    if (bookingId && session?.metadata?.purpose !== "balance") {
+      const { error } = await supabase.from("bookings").update({ status: "cancelled" })
+        .eq("id", bookingId).eq("status", "pending").eq("stripe_checkout_session_id", session.id);
+      if (error) return json({ error: error.message }, 500);
     }
+    return json({ received: true });
   }
 
-  return new Response(JSON.stringify({ received: true }), { headers: { "Content-Type": "application/json" } });
+  if (event.type !== "checkout.session.completed" && event.type !== "checkout.session.async_payment_succeeded") {
+    return json({ received: true });
+  }
+
+  const session = event.data.object;
+  const bookingId = session?.metadata?.booking_id;
+  const purpose = session?.metadata?.purpose === "balance" ? "balance" : "initial";
+  const paymentIntentId = session.payment_intent || session.id;
+  if (!bookingId || session.payment_status !== "paid") return json({ received: true });
+
+  const paidAmount = (session.amount_total || 0) / 100;
+
+  // Records the payment and updates the booking in one database
+  // transaction. Any error here goes back to Stripe as a 500, so Stripe
+  // retries; a retry of a payment that did get recorded comes back as
+  // "duplicate" and stops there.
+  const { data: outcome, error: recordErr } = await supabase.rpc("record_stripe_payment", {
+    p_booking_id: bookingId,
+    p_payment_intent_id: paymentIntentId,
+    p_checkout_session_id: session.id,
+    p_amount: paidAmount,
+    p_purpose: purpose,
+  });
+  if (recordErr) return json({ error: recordErr.message }, 500);
+
+  const result = outcome?.result;
+  if (result === "duplicate") return json({ received: true, duplicate: true });
+
+  if (result === "no_booking") {
+    await sendEmail(OWNER_EMAILS, "Stripe payment with no matching booking",
+      emailShell(heading("Payment with no booking") +
+        para(`Stripe took a payment of <strong>${money(paidAmount)}</strong> (payment ID ${escapeHtml(paymentIntentId)}) for a booking that doesn't exist on the website. Please check it in the Stripe dashboard and refund it if needed.`)));
+    return json({ received: true });
+  }
+
+  const { data: booking, error: loadErr } = await supabase.from("bookings").select("*").eq("id", bookingId).maybeSingle();
+  if (loadErr || !booking) return json({ received: true });
+
+  const dates = `${fmtDate(booking.checkin)} &rarr; ${fmtDate(booking.checkout)}`;
+  const guestName = `${escapeHtml(booking.guest_first_name)} ${escapeHtml(booking.guest_last_name)}`;
+
+  if (result === "clash") {
+    const refund = AUTO_REFUND_ON_CLASH ? await refundPayment(paymentIntentId) : { ok: false, error: "Automatic refunds are switched off" };
+    if (refund.ok) {
+      await supabase.from("booking_payments").insert({
+        booking_id: bookingId, stripe_payment_intent_id: refund.id, stripe_checkout_session_id: session.id,
+        amount: -paidAmount, purpose: "refund",
+      });
+      if (booking.guest_email) {
+        await sendEmail(booking.guest_email, "Sorry — those dates were just taken",
+          emailShell(heading("We're so sorry") +
+            para(`Dear ${escapeHtml(booking.guest_first_name) || "there"},`) +
+            para(`While your payment was going through, the dates you chose (${dates}) were booked by someone else, so we couldn't confirm your stay.`) +
+            para(`We've refunded your payment of <strong>${money(paidAmount)}</strong> in full. It usually reaches your account within 5–10 working days.`) +
+            para("We'd love to find you other dates — just reply to this email and we'll help.") +
+            button("See available dates", `${SITE_BASE_URL}#availability`)), bookingId);
+      }
+    }
+    await sendEmail(OWNER_EMAILS, refund.ok ? "Double booking avoided — payment refunded" : "ACTION NEEDED: payment for dates already booked",
+      emailShell(heading(refund.ok ? "Payment refunded automatically" : "Please refund this payment") +
+        para(refund.ok
+          ? `A guest paid for dates that had already been taken by the time their payment landed. Nothing was booked and their ${money(paidAmount)} has been refunded in Stripe. The guest has been emailed.`
+          : `A guest paid for dates that are already booked. Nothing was booked, but the refund could not be made automatically (${escapeHtml(refund.error)}). Please refund it in the Stripe dashboard and contact the guest.`) +
+        infoBox(infoRow("Guest", guestName) + infoRow("Email", escapeHtml(booking.guest_email)) + infoRow("Phone", escapeHtml(booking.guest_phone))
+          + infoRow("Dates", dates) + infoRow("Amount", money(paidAmount), true) + infoRow("Stripe payment ID", escapeHtml(paymentIntentId)))), bookingId);
+    return json({ received: true, clash: true, refunded: refund.ok });
+  }
+
+  const ref = booking.booking_ref;
+  const newAmountPaid = Number(booking.amount_paid || 0);
+  const paymentKind = purpose === "balance" ? "Balance" : (booking.payment_type === "full" ? "Full payment" : "Deposit");
+  if (ref) await tagStripePayment(paymentIntentId, ref, `${paymentKind} — Cringley Cottage ${ref}, ${booking.checkin} to ${booking.checkout}`);
+  const outstanding = Math.max(0, Math.round(((booking.total_amount || 0) - newAmountPaid) * 100) / 100);
+  const manageUrl = `${SITE_BASE_URL}pay-balance.html`;
+  const guestInfoUrl = `${SITE_BASE_URL}guest-info.html`;
+
+  let guestEmailOk = true;
+  if (booking.guest_email) {
+    let guestHtml: string;
+    let subject: string;
+    if (purpose === "initial") {
+      subject = `Booking Confirmed — ${ref}`;
+      let rows = infoRow("Booking reference", escapeHtml(ref), true)
+        + infoRow("Dates", dates)
+        + (booking.discount_amount > 0 ? infoRow("Discount applied", `${money(booking.discount_amount)} (${escapeHtml(booking.discount_code)})`) : "")
+        + infoRow("Total cost", money(booking.total_amount))
+        + infoRow("Paid today", money(paidAmount));
+      if (outstanding > 0) rows += infoRow("Balance due", `${money(outstanding)} by ${fmtDate(booking.balance_due_date)}`, true);
+      guestHtml = emailShell(
+        heading("Booking confirmed") +
+        para(`Dear ${escapeHtml(booking.guest_first_name) || "there"},`) +
+        para("Thank you — your booking at Cringley Cottage is confirmed!") +
+        infoBox(rows) +
+        (outstanding > 0
+          ? para(`You can pay the remaining balance any time before then at <a href="${manageUrl}" style="color:#5e7a52;">${manageUrl}</a> using your booking reference and email.`)
+          : para("Your stay is paid in full — nothing more to do!")) +
+        para(`We look forward to welcoming you to Cringley Cottage! Check-in is from <strong>3pm</strong>.`) +
+        button("View guest information", guestInfoUrl)
+      );
+    } else {
+      subject = `Balance Paid — ${ref}`;
+      guestHtml = emailShell(
+        heading("Balance received") +
+        para(`Dear ${escapeHtml(booking.guest_first_name) || "there"},`) +
+        para(`Thank you — we've received your balance payment of <strong>${money(paidAmount)}</strong>. Your booking is now paid in full.`) +
+        infoBox(infoRow("Booking reference", escapeHtml(ref), true) + infoRow("Status", "Paid in full", true)) +
+        para(`We look forward to welcoming you to Cringley Cottage! Check-in is from <strong>3pm</strong>.`) +
+        button("View guest information", guestInfoUrl)
+      );
+    }
+    guestEmailOk = await sendEmail(booking.guest_email, subject, guestHtml, bookingId);
+  }
+
+  const ownerRows = infoRow("Guest", guestName)
+    + infoRow("Email", escapeHtml(booking.guest_email))
+    + infoRow("Phone", escapeHtml(booking.guest_phone))
+    + infoRow("Dates", dates)
+    + infoRow("Guests", String(booking.guests_count || ""))
+    + infoRow("Dog", booking.has_dog ? "Yes" : "No")
+    + infoRow("Address", escapeHtml([booking.address_line1, booking.address_line2, booking.city, booking.postcode, booking.country].filter(Boolean).join(", ")))
+    + (booking.discount_amount > 0 ? infoRow("Discount code", `${escapeHtml(booking.discount_code)} (${money(booking.discount_amount)} off)`) : "")
+    + infoRow("Payment just made", `${money(paidAmount)} (${paymentKind})`)
+    + infoRow("Stripe payment ID", escapeHtml(paymentIntentId))
+    + infoRow("Total paid so far", money(newAmountPaid))
+    + infoRow("Total cost", money(booking.total_amount), true)
+    + (booking.message ? infoRow("Message", escapeHtml(booking.message)) : "");
+  const ownerHtml = emailShell(
+    heading(purpose === "initial" ? "New confirmed booking" : "Balance paid") +
+    para(`Booking reference <strong>${escapeHtml(ref)}</strong>`) +
+    (guestEmailOk ? "" : para(`<strong>The guest's confirmation email could not be sent.</strong> Please contact them directly.`)) +
+    infoBox(ownerRows)
+  );
+  await sendEmail(OWNER_EMAILS, purpose === "initial" ? `New confirmed booking ${ref}` : `Balance paid for ${ref}`, ownerHtml, bookingId);
+
+  return json({ received: true });
 });

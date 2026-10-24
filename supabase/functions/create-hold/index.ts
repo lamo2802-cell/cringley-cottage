@@ -50,6 +50,18 @@ Deno.serve(async (req: Request) => {
       return new Response(JSON.stringify({ ok: false, error: `Bookings need at least ${minAdvance} night${minAdvance === 1 ? '' : 's'} notice` }), { status: 400, headers: { ...CORS_HEADERS, "Content-Type": "application/json" } });
     }
 
+    const nowIso = new Date().toISOString();
+    // Holds that have run out but that the 10-minute cleanup job hasn't
+    // reached yet: cancel them now, or the database's no-overlap rule would
+    // still count them and turn this visitor away.
+    await supabase
+      .from("bookings")
+      .update({ status: "cancelled" })
+      .eq("status", "pending")
+      .lt("hold_expires_at", nowIso)
+      .lt("checkin", checkout)
+      .gt("checkout", checkin);
+
     const { data: clashes, error: clashErr } = await supabase
       .from("bookings")
       .select("id, hold_expires_at")
@@ -81,6 +93,11 @@ Deno.serve(async (req: Request) => {
       .select("id")
       .single();
 
+    // 23P01 is the no-overlap rule: someone else grabbed the dates in the
+    // moment between the check above and this insert.
+    if (insertErr?.code === "23P01") {
+      return new Response(JSON.stringify({ ok: false, error: "Those dates are no longer available" }), { status: 409, headers: { ...CORS_HEADERS, "Content-Type": "application/json" } });
+    }
     if (insertErr) {
       return new Response(JSON.stringify({ ok: false, error: insertErr.message }), { status: 500, headers: { ...CORS_HEADERS, "Content-Type": "application/json" } });
     }

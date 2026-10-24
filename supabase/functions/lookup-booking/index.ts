@@ -24,12 +24,14 @@ Deno.serve(async (req: Request) => {
     const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
     const { data: booking, error } = await supabase
       .from("bookings")
-      .select("id, booking_ref, checkin, checkout, status, payment_type, total_amount, amount_paid, balance_due_date, guest_first_name")
-      .eq("booking_ref", booking_ref.trim().toUpperCase())
-      .ilike("guest_email", email.trim())
+      .select("id, booking_ref, checkin, checkout, status, payment_type, total_amount, amount_paid, balance_due_date, guest_first_name, guest_email")
+      .eq("booking_ref", String(booking_ref).trim().toUpperCase())
       .maybeSingle();
 
-    if (error || !booking) {
+    // Compare the email exactly (ignoring case) here rather than with a
+    // database pattern match, where "%" would match any address.
+    const emailMatches = !!booking && (booking.guest_email || "").trim().toLowerCase() === String(email).trim().toLowerCase();
+    if (error || !booking || !emailMatches) {
       return new Response(JSON.stringify({ ok: false, error: "No booking found with that reference and email — please check and try again." }), { status: 404, headers: { ...CORS_HEADERS, "Content-Type": "application/json" } });
     }
 

@@ -2164,9 +2164,11 @@
       if (payData.ok && payData.checkout_url) {
         window.location.href = payData.checkout_url;
       } else {
+        // Nothing is booked until payment goes through; the owners have
+        // been emailed by create-checkout-session so they can follow up.
         document.getElementById('bpSuccess').innerHTML =
-          `<p style="color:var(--cream)">Your booking is saved, but payment setup isn't ready yet.</p>
-           <p style="font-size:0.82rem;color:rgba(247,242,234,0.6)">We'll be in touch shortly to arrange payment — ${payData.error || ''}</p>`;
+          `<p style="color:var(--cream)">Sorry, we couldn't open the payment page, so your booking has <strong>not</strong> been made yet.</p>
+           <p style="font-size:0.82rem;color:rgba(247,242,234,0.6)">Please try again in a few minutes, or email <a href="mailto:hello@cringleycottage.com" style="color:var(--cream)">hello@cringleycottage.com</a> and we'll help you book. We've been told about the problem.</p>`;
       }
     } catch (e) {
       showToast('Something went wrong — please try again or contact us directly.');

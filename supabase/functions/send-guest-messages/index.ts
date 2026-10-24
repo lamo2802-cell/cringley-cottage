@@ -17,7 +17,9 @@ const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
 const SYNC_SECRET = Deno.env.get("SYNC_SECRET");
 const FROM_EMAIL = "Cringley Cottage <hello@cringleycottage.com>";
 const SITE_BASE_URL = "https://www.cringleycottage.com/";
+const OWNER_EMAILS = ["lamo2802@gmail.com", "rpeacey987@gmail.com"];
 
+function money(n: number): string { return "£" + Number(n).toFixed(2).replace(/\.00$/, ""); }
 function fmtDate(d: string): string {
   return new Date(d + "T00:00:00").toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
 }
@@ -65,8 +67,8 @@ function button(text: string, url: string): string {
     <a href="${url}" style="display:inline-block;padding:13px 28px;font-family:'Helvetica Neue',Arial,sans-serif;font-size:13px;letter-spacing:0.5px;text-transform:uppercase;color:#ffffff;text-decoration:none;">${text}</a>
   </td></tr></table>`;
 }
-function escapeHtml(s: string): string {
-  return (s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+function escapeHtml(s: unknown): string {
+  return (s ?? "").toString().replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 // Renders the owner's plain-text admin copy as paragraphs/bullets, preserving
 // blank-line breaks and turning "- " lines into a simple bullet list.
@@ -82,15 +84,32 @@ function freeTextToHtml(text: string): string {
   }).join("");
 }
 
-async function sendEmail(to: string, subject: string, html: string) {
-  if (!RESEND_API_KEY) return;
-  try {
-    await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: { "Authorization": `Bearer ${RESEND_API_KEY}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ from: FROM_EMAIL, to, subject, html }),
-    });
-  } catch { /* best-effort */ }
+// Email failures used to vanish silently. Each send is now recorded in
+// email_log (admin shows the failures), and the result is returned so the
+// caller can react. Never throws.
+const emailLogDb = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
+async function sendEmail(to: string | string[], subject: string, html: string, bookingId?: string): Promise<boolean> {
+  let ok = false;
+  let error: string | null = null;
+  if (!RESEND_API_KEY) {
+    error = "RESEND_API_KEY not set";
+  } else {
+    try {
+      const res = await fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${RESEND_API_KEY}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ from: FROM_EMAIL, to, subject, html }),
+      });
+      ok = res.ok;
+      if (!ok) error = `Resend ${res.status}: ${(await res.text()).slice(0, 500)}`;
+    } catch (e) {
+      error = String(e);
+    }
+  }
+  await emailLogDb.from("email_log").insert({
+    function_name: "send-guest-messages", recipient: [to].flat().join(", "), subject, ok, error, booking_id: bookingId ?? null,
+  });
+  return ok;
 }
 
 function ukNow(): { date: string; time: string } {
@@ -134,17 +153,52 @@ Deno.serve(async (req: Request) => {
     const checkinText = settings?.checkin_email_text || "";
     const checkoutText = settings?.checkout_email_text || "";
 
-    let checkinSent = 0, checkoutSent = 0;
+    let checkinSent = 0, checkoutSent = 0, unpaidHeld = 0;
 
     if (nowUK >= checkinTime) {
       const { data: arriving } = await supabase
         .from("bookings")
-        .select("id, booking_ref, guest_first_name, guest_email, checkin, checkout")
+        .select("id, booking_ref, guest_first_name, guest_last_name, guest_email, guest_phone, checkin, checkout, total_amount, amount_paid, unpaid_arrival_alert_sent_at")
         .eq("source", "direct").eq("is_blocked", false).eq("status", "confirmed")
         .eq("checkin", todayUK).is("checkin_email_sent_at", null)
         .not("guest_email", "is", null);
 
       for (const b of arriving || []) {
+        const outstanding = Math.max(0, Math.round(((b.total_amount || 0) - (b.amount_paid || 0)) * 100) / 100);
+
+        // The check-in email carries the key-safe code, so it only goes to a
+        // guest who has paid in full. Otherwise they get a pay-now email and
+        // the owners get one alert. This runs every 15 minutes, so the
+        // check-in email still goes out as soon as the balance is paid.
+        if (outstanding > 0) {
+          if (b.unpaid_arrival_alert_sent_at) continue;
+          await sendEmail(b.guest_email, `Your balance is due before check-in — ${b.booking_ref}`, emailShell(
+            heading("Your balance is still to pay") +
+            para(`Dear ${escapeHtml(b.guest_first_name) || "there"},`) +
+            para("We're looking forward to welcoming you today! Our records show the balance for your stay hasn't been paid yet, so we can't send your arrival instructions until it is.") +
+            infoBox(
+              infoRow("Booking reference", escapeHtml(b.booking_ref) || "—", true) +
+              infoRow("Balance to pay", money(outstanding), true)
+            ) +
+            para("As soon as it's paid, your check-in details will arrive by email automatically. If you think this is a mistake, just reply to this email.") +
+            button("Pay your balance", `${SITE_BASE_URL}pay-balance.html`)
+          ), b.id);
+          await sendEmail(OWNER_EMAILS, `Unpaid balance for today's arrival — ${b.booking_ref}`, emailShell(
+            heading("Guest arriving today hasn't paid") +
+            para("The check-in email with the key-safe code has been held back. The guest has been asked to pay, and the check-in email will go automatically once they do.") +
+            infoBox(
+              infoRow("Booking reference", escapeHtml(b.booking_ref) || "—", true) +
+              infoRow("Guest", `${escapeHtml(b.guest_first_name)} ${escapeHtml(b.guest_last_name)}`) +
+              infoRow("Email", escapeHtml(b.guest_email)) +
+              infoRow("Phone", escapeHtml(b.guest_phone)) +
+              infoRow("Outstanding", money(outstanding), true)
+            )
+          ), b.id);
+          await supabase.from("bookings").update({ unpaid_arrival_alert_sent_at: new Date().toISOString() }).eq("id", b.id);
+          unpaidHeld++;
+          continue;
+        }
+
         const html = emailShell(
           heading("You're checking in today!") +
           para(`Dear ${escapeHtml(b.guest_first_name) || "there"},`) +
@@ -155,8 +209,17 @@ Deno.serve(async (req: Request) => {
           freeTextToHtml(checkinText) +
           button("View guest information", `${SITE_BASE_URL}guest-info.html`)
         );
-        await sendEmail(b.guest_email, `Check-in Today — Cringley Cottage`, html);
+        const sent = await sendEmail(b.guest_email, `Check-in Today — Cringley Cottage`, html, b.id);
+        // Marked as sent either way so a bad address isn't retried all day,
+        // but a failure tells the owners to pass the access details on.
         await supabase.from("bookings").update({ checkin_email_sent_at: new Date().toISOString() }).eq("id", b.id);
+        if (!sent) {
+          await sendEmail(OWNER_EMAILS, `Check-in email FAILED — ${b.booking_ref}`, emailShell(
+            heading("Check-in email didn't send") +
+            para(`The check-in email for ${escapeHtml(b.guest_first_name)} ${escapeHtml(b.guest_last_name)} (arriving today) could not be sent. Please send them the key-safe details yourself.`) +
+            infoBox(infoRow("Email", escapeHtml(b.guest_email)) + infoRow("Phone", escapeHtml(b.guest_phone)))
+          ), b.id);
+        }
         checkinSent++;
       }
     }
@@ -179,13 +242,13 @@ Deno.serve(async (req: Request) => {
           ) +
           freeTextToHtml(checkoutText)
         );
-        await sendEmail(b.guest_email, `Checking Out Tomorrow — Cringley Cottage`, html);
+        await sendEmail(b.guest_email, `Checking Out Tomorrow — Cringley Cottage`, html, b.id);
         await supabase.from("bookings").update({ checkout_email_sent_at: new Date().toISOString() }).eq("id", b.id);
         checkoutSent++;
       }
     }
 
-    return new Response(JSON.stringify({ ok: true, checkinSent, checkoutSent, todayUK, nowUK }), { headers: { "Content-Type": "application/json" } });
+    return new Response(JSON.stringify({ ok: true, checkinSent, checkoutSent, unpaidHeld, todayUK, nowUK }), { headers: { "Content-Type": "application/json" } });
   } catch (e) {
     return new Response(JSON.stringify({ ok: false, error: String(e) }), { status: 500, headers: { "Content-Type": "application/json" } });
   }

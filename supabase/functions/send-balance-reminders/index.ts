@@ -3,7 +3,8 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
 
 // Runs daily (pg_cron). Emails a branded balance-due reminder to any
 // confirmed booking with an unpaid balance due within REMINDER_WINDOW_DAYS,
-// exactly once per booking (balance_reminder_sent_at guards against repeats).
+// exactly once per booking (balance_reminder_sent_at guards against repeats),
+// then emails the owners a list of any balances already overdue.
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -12,6 +13,7 @@ const SYNC_SECRET = Deno.env.get("SYNC_SECRET");
 const REMINDER_WINDOW_DAYS = 7;
 const FROM_EMAIL = "Cringley Cottage <hello@cringleycottage.com>";
 const SITE_BASE_URL = "https://www.cringleycottage.com/";
+const OWNER_EMAILS = ["lamo2802@gmail.com", "rpeacey987@gmail.com"];
 
 function money(n: number): string { return "£" + Number(n).toFixed(2).replace(/\.00$/, ""); }
 function fmtDate(d: string): string {
@@ -67,15 +69,32 @@ function button(text: string, url: string): string {
   </td></tr></table>`;
 }
 
-async function sendEmail(to: string, subject: string, html: string) {
-  if (!RESEND_API_KEY) return;
-  try {
-    await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: { "Authorization": `Bearer ${RESEND_API_KEY}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ from: FROM_EMAIL, to, subject, html }),
-    });
-  } catch { /* best-effort */ }
+// Email failures used to vanish silently. Each send is now recorded in
+// email_log (admin shows the failures), and the result is returned so the
+// caller can react. Never throws.
+const emailLogDb = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
+async function sendEmail(to: string | string[], subject: string, html: string, bookingId?: string): Promise<boolean> {
+  let ok = false;
+  let error: string | null = null;
+  if (!RESEND_API_KEY) {
+    error = "RESEND_API_KEY not set";
+  } else {
+    try {
+      const res = await fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${RESEND_API_KEY}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ from: FROM_EMAIL, to, subject, html }),
+      });
+      ok = res.ok;
+      if (!ok) error = `Resend ${res.status}: ${(await res.text()).slice(0, 500)}`;
+    } catch (e) {
+      error = String(e);
+    }
+  }
+  await emailLogDb.from("email_log").insert({
+    function_name: "send-balance-reminders", recipient: [to].flat().join(", "), subject, ok, error, booking_id: bookingId ?? null,
+  });
+  return ok;
 }
 
 Deno.serve(async (req: Request) => {
@@ -126,12 +145,42 @@ Deno.serve(async (req: Request) => {
         button("Pay your balance", manageUrl)
       );
 
-      await sendEmail(booking.guest_email, `Balance Due Soon — ${booking.booking_ref}`, html);
+      await sendEmail(booking.guest_email, `Balance Due Soon — ${booking.booking_ref}`, html, booking.id);
       await supabase.from("bookings").update({ balance_reminder_sent_at: new Date().toISOString() }).eq("id", booking.id);
       sent++;
     }
 
-    return new Response(JSON.stringify({ ok: true, sent }), { headers: { "Content-Type": "application/json" } });
+    // Daily nudge to the owners for any balance that's past its due date and
+    // still unpaid, while the stay is still to come. Nothing is cancelled
+    // automatically; that stays the owners' call.
+    const { data: overdue, error: overdueErr } = await supabase
+      .from("bookings")
+      .select("id, booking_ref, guest_first_name, guest_last_name, guest_email, guest_phone, checkin, balance_due_date, total_amount, amount_paid")
+      .eq("status", "confirmed")
+      .not("balance_due_date", "is", null)
+      .lt("balance_due_date", today)
+      .gte("checkin", today)
+      .order("checkin");
+    if (overdueErr) {
+      return new Response(JSON.stringify({ ok: false, sent, error: overdueErr.message }), { status: 500, headers: { "Content-Type": "application/json" } });
+    }
+    const overdueRows = (overdue || [])
+      .map(b => ({ ...b, outstanding: Math.max(0, Math.round(((b.total_amount || 0) - (b.amount_paid || 0)) * 100) / 100) }))
+      .filter(b => b.outstanding > 0);
+    if (overdueRows.length > 0) {
+      const rows = overdueRows.map(b => infoRow(
+        `${escapeHtml(b.booking_ref)} · ${escapeHtml(b.guest_first_name)} ${escapeHtml(b.guest_last_name)}<br><span style="font-size:12px;">${escapeHtml(b.guest_email)} · ${escapeHtml(b.guest_phone)}</span>`,
+        `${money(b.outstanding)}<br><span style="font-size:12px;font-weight:400;">due ${fmtDate(b.balance_due_date)}, arrives ${fmtDate(b.checkin)}</span>`,
+        true,
+      )).join("");
+      await sendEmail(OWNER_EMAILS, `Overdue balance${overdueRows.length === 1 ? "" : "s"}: ${overdueRows.length} booking${overdueRows.length === 1 ? "" : "s"}`, emailShell(
+        heading("Balances overdue") +
+        para("These bookings are past their balance due date and still unpaid. The key-safe code won't be sent until they're paid in full.") +
+        infoBox(rows)
+      ));
+    }
+
+    return new Response(JSON.stringify({ ok: true, sent, overdue: overdueRows.length }), { headers: { "Content-Type": "application/json" } });
   } catch (e) {
     return new Response(JSON.stringify({ ok: false, error: String(e) }), { status: 500, headers: { "Content-Type": "application/json" } });
   }
