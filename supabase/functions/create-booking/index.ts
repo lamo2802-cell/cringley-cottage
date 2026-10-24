@@ -168,8 +168,14 @@ Deno.serve(async (req: Request) => {
       hold_id, checkin, checkout,
       first_name, last_name, email, phone,
       address_line1, address_line2, city, postcode, country,
-      has_dog, adults, children, message, discount_code, marketing_consent,
+      has_dog, adults, children, message, discount_code, marketing_consent, terms_accepted,
     } = body;
+
+    // The guest must actively accept the Terms (non-refundable deposit,
+    // cancellation rules) before paying; when they did is stored below.
+    if (terms_accepted !== true) {
+      return new Response(JSON.stringify({ ok: false, error: "Please tick the box to accept the Terms & Conditions." }), { status: 400, headers: { ...CORS_HEADERS, "Content-Type": "application/json" } });
+    }
 
     if (!email || typeof email !== "string") {
       return new Response(JSON.stringify({ ok: false, error: "Email required" }), { status: 400, headers: { ...CORS_HEADERS, "Content-Type": "application/json" } });
@@ -260,6 +266,7 @@ Deno.serve(async (req: Request) => {
       discount_amount: pricing.discountAmount,
       marketing_consent: !!marketing_consent,
       marketing_consent_at: marketing_consent ? new Date().toISOString() : null,
+      terms_accepted_at: new Date().toISOString(),
     };
 
     if (fullyDiscounted) {
