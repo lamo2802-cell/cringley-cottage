@@ -22,6 +22,10 @@ const FROM_EMAIL = "Cringley Cottage <hello@cringleycottage.com>";
 const OWNER_EMAILS = ["lamo2802@gmail.com", "rpeacey987@gmail.com"];
 const SITE_BASE_URL = "https://www.cringleycottage.com/";
 const MAX_STAY_NIGHTS = 28;
+const DEFAULT_MIN_NIGHTS = 2;
+// Per visitor: this many booking submissions in this many seconds.
+const BOOKINGS_PER_VISITOR = 8;
+const BOOKING_LIMIT_WINDOW_SECONDS = 15 * 60;
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
@@ -58,7 +62,7 @@ function rateFor(dateISO: string, rates: { from: string; to: string; rate: numbe
 async function validateDiscountCode(supabase: any, code: string) {
   const { data: row } = await supabase
     .from("discount_codes")
-    .select("id, percent_off, active, max_uses, times_used, expires_at")
+    .select("id, code, percent_off, active, max_uses, times_used, expires_at")
     .eq("code", code.trim().toUpperCase())
     .maybeSingle();
   if (!row || !row.active) return null;
@@ -156,6 +160,19 @@ async function sendEmail(to: string | string[], subject: string, html: string, b
   return ok;
 }
 
+// One request from one visitor, recorded against a keyed hash of their IP
+// address so the address itself is never stored. Lets the request through if
+// the limit can't be checked, so a hiccup never blocks a real guest.
+async function allowRequest(supabase: any, fn: string, req: Request, windowSeconds: number, max: number): Promise<boolean> {
+  const ip = (req.headers.get("x-forwarded-for") || "").split(",")[0].trim() || req.headers.get("cf-connecting-ip") || "";
+  if (!ip) return true;
+  const hmacKey = await crypto.subtle.importKey("raw", new TextEncoder().encode(SERVICE_ROLE_KEY), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  const sig = new Uint8Array(await crypto.subtle.sign("HMAC", hmacKey, new TextEncoder().encode(ip)));
+  const key = `${fn}:${Array.from(sig.slice(0, 12)).map(b => b.toString(16).padStart(2, "0")).join("")}`;
+  const { data, error } = await supabase.rpc("hit_rate_limit", { p_key: key, p_window_seconds: windowSeconds, p_max: max });
+  return error ? true : data !== false;
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: CORS_HEADERS });
   if (req.method !== "POST") {
@@ -195,6 +212,9 @@ Deno.serve(async (req: Request) => {
     }
 
     const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
+    if (!(await allowRequest(supabase, "create-booking", req, BOOKING_LIMIT_WINDOW_SECONDS, BOOKINGS_PER_VISITOR))) {
+      return new Response(JSON.stringify({ ok: false, error: "Too many attempts. Please wait a few minutes and try again." }), { status: 429, headers: { ...CORS_HEADERS, "Content-Type": "application/json" } });
+    }
     const settings = await loadSettings(supabase);
     let bookingId: string;
     let finalCheckin: string, finalCheckout: string;
@@ -213,6 +233,11 @@ Deno.serve(async (req: Request) => {
       const nightsRequested = Math.round((new Date(checkout + "T00:00:00").getTime() - new Date(checkin + "T00:00:00").getTime()) / 86400000);
       if (nightsRequested > MAX_STAY_NIGHTS) {
         return new Response(JSON.stringify({ ok: false, error: `The longest single stay is ${MAX_STAY_NIGHTS} nights` }), { status: 400, headers: { ...CORS_HEADERS, "Content-Type": "application/json" } });
+      }
+      const { data: season } = await supabase.from("rates").select("min_nights").lte("date_from", checkin).gte("date_to", checkin).limit(1).maybeSingle();
+      const minNights = season?.min_nights ?? DEFAULT_MIN_NIGHTS;
+      if (nightsRequested < minNights) {
+        return new Response(JSON.stringify({ ok: false, error: `Minimum stay for these dates is ${minNights} nights` }), { status: 400, headers: { ...CORS_HEADERS, "Content-Type": "application/json" } });
       }
       const today = new Date(); today.setHours(0, 0, 0, 0);
       const cutoff = new Date(today); cutoff.setDate(cutoff.getDate() + settings.minAdvanceNights);
@@ -270,7 +295,14 @@ Deno.serve(async (req: Request) => {
     };
 
     if (fullyDiscounted) {
-      // Skip Stripe entirely — confirm right now.
+      // Skip Stripe entirely — confirm right now. The code's use is claimed
+      // first, in one step, so two guests can't both take its last use.
+      if (discountRow) {
+        const { data: claimed } = await supabase.rpc("claim_discount_use", { p_code: discountRow.code });
+        if (claimed !== true) {
+          return new Response(JSON.stringify({ ok: false, error: "That discount code is no longer valid" }), { status: 400, headers: { ...CORS_HEADERS, "Content-Type": "application/json" } });
+        }
+      }
       const bookingRef = await nextBookingRef(supabase);
       baseUpdates.status = "confirmed";
       baseUpdates.deposit_paid = true;
@@ -279,10 +311,6 @@ Deno.serve(async (req: Request) => {
 
       const { error: updateErr } = await supabase.from("bookings").update(baseUpdates).eq("id", bookingId);
       if (updateErr) return new Response(JSON.stringify({ ok: false, error: updateErr.message }), { status: 500, headers: { ...CORS_HEADERS, "Content-Type": "application/json" } });
-
-      if (discountRow) {
-        await supabase.from("discount_codes").update({ times_used: discountRow.times_used + 1 }).eq("id", discountRow.id);
-      }
 
       const guestInfoUrl = `${SITE_BASE_URL}guest-info.html`;
       await sendEmail(email, `Booking Confirmed — ${bookingRef}`, emailShell(

@@ -5,12 +5,20 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
 // into "Book Now". Validates dates against the owner-configured minimum
 // notice period (site_settings.min_advance_nights) and the maximum stay
 // length server-side — never trusts the browser's own calendar-greying
-// alone.
+// alone. Also enforces each season's minimum stay, and limits how many holds
+// one visitor (and everyone together) can have, so a script can't make the
+// cottage look fully booked.
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const HOLD_MINUTES = 10;
 const MAX_STAY_NIGHTS = 28;
+const DEFAULT_MIN_NIGHTS = 2;
+// Per visitor: this many holds in this many seconds.
+const HOLDS_PER_VISITOR = 8;
+const HOLD_LIMIT_WINDOW_SECONDS = 15 * 60;
+// Everyone together: this many unfinished holds at once.
+const MAX_LIVE_HOLDS = 15;
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
@@ -20,6 +28,19 @@ const CORS_HEADERS = {
 
 function isValidDate(s: unknown): s is string {
   return typeof s === "string" && /^\d{4}-\d{2}-\d{2}$/.test(s);
+}
+
+// One request from one visitor, recorded against a keyed hash of their IP
+// address so the address itself is never stored. Lets the request through if
+// the limit can't be checked, so a hiccup never blocks a real guest.
+async function allowRequest(supabase: any, fn: string, req: Request, windowSeconds: number, max: number): Promise<boolean> {
+  const ip = (req.headers.get("x-forwarded-for") || "").split(",")[0].trim() || req.headers.get("cf-connecting-ip") || "";
+  if (!ip) return true;
+  const hmacKey = await crypto.subtle.importKey("raw", new TextEncoder().encode(SERVICE_ROLE_KEY), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  const sig = new Uint8Array(await crypto.subtle.sign("HMAC", hmacKey, new TextEncoder().encode(ip)));
+  const key = `${fn}:${Array.from(sig.slice(0, 12)).map(b => b.toString(16).padStart(2, "0")).join("")}`;
+  const { data, error } = await supabase.rpc("hit_rate_limit", { p_key: key, p_window_seconds: windowSeconds, p_max: max });
+  return error ? true : data !== false;
 }
 
 Deno.serve(async (req: Request) => {
@@ -41,6 +62,28 @@ Deno.serve(async (req: Request) => {
     }
 
     const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
+
+    const busy = JSON.stringify({ ok: false, error: "We're getting a lot of booking requests right now. Please try again in a few minutes." });
+    if (!(await allowRequest(supabase, "create-hold", req, HOLD_LIMIT_WINDOW_SECONDS, HOLDS_PER_VISITOR))) {
+      return new Response(busy, { status: 429, headers: { ...CORS_HEADERS, "Content-Type": "application/json" } });
+    }
+    const { count: liveHolds } = await supabase
+      .from("bookings")
+      .select("id", { count: "exact", head: true })
+      .eq("source", "direct")
+      .eq("status", "pending")
+      .is("guest_email", null)
+      .gt("hold_expires_at", new Date().toISOString());
+    if ((liveHolds ?? 0) >= MAX_LIVE_HOLDS) {
+      return new Response(busy, { status: 429, headers: { ...CORS_HEADERS, "Content-Type": "application/json" } });
+    }
+
+    // The minimum stay is set per season in Admin → Rates, by check-in date.
+    const { data: season } = await supabase.from("rates").select("min_nights").lte("date_from", checkin).gte("date_to", checkin).limit(1).maybeSingle();
+    const minNights = season?.min_nights ?? DEFAULT_MIN_NIGHTS;
+    if (nightsRequested < minNights) {
+      return new Response(JSON.stringify({ ok: false, error: `Minimum stay for these dates is ${minNights} nights` }), { status: 400, headers: { ...CORS_HEADERS, "Content-Type": "application/json" } });
+    }
 
     const { data: settings } = await supabase.from("site_settings").select("min_advance_nights").eq("id", 1).maybeSingle();
     const minAdvance = settings?.min_advance_nights ?? 2;
