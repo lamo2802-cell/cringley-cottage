@@ -12,13 +12,11 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
 const DEFAULT_RATE = 120;
-// Once the guest submits their details, they still need to complete Stripe
-// checkout. Rather than clearing the hold entirely (which left abandoned
-// checkouts blocking dates forever — nothing ever expired them, since the
-// cleanup cron only looked at holds with hold_expires_at still set), extend
-// it far enough to cover a normal checkout. The cleanup cron reclaims it if
-// they never pay; stripe-webhook nulls this out for real once payment
-// actually succeeds, so a genuinely confirmed booking can never expire.
+// Once the guest submits their details, the hold is renewed for long enough
+// to open the Stripe page. create-checkout-session then extends it to
+// outlast that page (which expires after 31 minutes). The cleanup cron
+// reclaims it if they never pay; stripe-webhook nulls this out for real once
+// payment actually succeeds, so a genuinely confirmed booking can never expire.
 const CHECKOUT_HOLD_MINUTES = 10;
 const FROM_EMAIL = "Cringley Cottage <hello@cringleycottage.com>";
 const OWNER_EMAILS = ["lamo2802@gmail.com", "rpeacey987@gmail.com"];
@@ -130,11 +128,32 @@ function infoRow(l: string, v: string, bold = false) {
 }
 function infoBox(rows: string) { return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f3f0e8;border-radius:4px;margin:4px 0 18px;"><tr><td style="padding:18px 20px;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0">${rows}</table></td></tr></table>`; }
 function button(t: string, u: string) { return `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:22px 0 8px;"><tr><td style="background:#5e7a52;border-radius:3px;"><a href="${u}" style="display:inline-block;padding:13px 28px;font-family:'Helvetica Neue',Arial,sans-serif;font-size:13px;letter-spacing:0.5px;text-transform:uppercase;color:#ffffff;text-decoration:none;">${t}</a></td></tr></table>`; }
-async function sendEmail(to: string | string[], subject: string, html: string) {
-  if (!RESEND_API_KEY) return;
-  try {
-    await fetch("https://api.resend.com/emails", { method: "POST", headers: { "Authorization": `Bearer ${RESEND_API_KEY}`, "Content-Type": "application/json" }, body: JSON.stringify({ from: FROM_EMAIL, to, subject, html }) });
-  } catch { /* best-effort */ }
+// Email failures used to vanish silently. Each send is now recorded in
+// email_log (admin shows the failures), and the result is returned so the
+// caller can react. Never throws.
+const emailLogDb = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
+async function sendEmail(to: string | string[], subject: string, html: string, bookingId?: string): Promise<boolean> {
+  let ok = false;
+  let error: string | null = null;
+  if (!RESEND_API_KEY) {
+    error = "RESEND_API_KEY not set";
+  } else {
+    try {
+      const res = await fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${RESEND_API_KEY}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ from: FROM_EMAIL, to, subject, html }),
+      });
+      ok = res.ok;
+      if (!ok) error = `Resend ${res.status}: ${(await res.text()).slice(0, 500)}`;
+    } catch (e) {
+      error = String(e);
+    }
+  }
+  await emailLogDb.from("email_log").insert({
+    function_name: "create-booking", recipient: [to].flat().join(", "), subject, ok, error, booking_id: bookingId ?? null,
+  });
+  return ok;
 }
 
 Deno.serve(async (req: Request) => {
@@ -194,12 +213,17 @@ Deno.serve(async (req: Request) => {
       if (new Date(checkin + "T00:00:00") < cutoff) {
         return new Response(JSON.stringify({ ok: false, error: `Bookings need at least ${settings.minAdvanceNights} night${settings.minAdvanceNights === 1 ? '' : 's'} notice` }), { status: 400, headers: { ...CORS_HEADERS, "Content-Type": "application/json" } });
       }
+      // Clear run-out holds the cleanup job hasn't reached yet, or the
+      // database's no-overlap rule would still count them.
+      await supabase.from("bookings").update({ status: "cancelled" }).eq("status", "pending").lt("hold_expires_at", new Date().toISOString()).lt("checkin", checkout).gt("checkout", checkin);
       const { data: clashes, error: clashErr } = await supabase.from("bookings").select("id, hold_expires_at").neq("status", "cancelled").lt("checkin", checkout).gt("checkout", checkin);
       if (clashErr) return new Response(JSON.stringify({ ok: false, error: clashErr.message }), { status: 500, headers: { ...CORS_HEADERS, "Content-Type": "application/json" } });
       const now = Date.now();
       const realClash = (clashes || []).some(c => !c.hold_expires_at || new Date(c.hold_expires_at).getTime() > now);
       if (realClash) return new Response(JSON.stringify({ ok: false, error: "Those dates are no longer available" }), { status: 409, headers: { ...CORS_HEADERS, "Content-Type": "application/json" } });
       const { data: inserted, error: insertErr } = await supabase.from("bookings").insert({ checkin, checkout, source: "direct", status: "pending" }).select("id").single();
+      // 23P01: the no-overlap rule caught someone grabbing the dates in between.
+      if (insertErr?.code === "23P01") return new Response(JSON.stringify({ ok: false, error: "Those dates are no longer available" }), { status: 409, headers: { ...CORS_HEADERS, "Content-Type": "application/json" } });
       if (insertErr) return new Response(JSON.stringify({ ok: false, error: insertErr.message }), { status: 500, headers: { ...CORS_HEADERS, "Content-Type": "application/json" } });
       bookingId = inserted.id; finalCheckin = checkin; finalCheckout = checkout;
     }
