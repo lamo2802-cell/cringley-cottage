@@ -39,7 +39,7 @@ function emailShell(bodyHtml: string): string {
   <tr><td style="padding:36px 40px 8px;">${bodyHtml}</td></tr>
   <tr><td style="padding:28px 40px 32px;">
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td style="border-top:1px solid #e5ddd0;padding-top:20px;">
-      <p style="margin:0 0 4px;font-family:Georgia,serif;font-size:13px;color:#7a6f60;">Cringley Cottage &middot; Askrigg &middot; Yorkshire Dales</p>
+      <p style="margin:0 0 4px;font-family:Georgia,serif;font-size:13px;color:#7a6f60;">Cringley Cottage &middot; Askrigg &middot; Yorkshire Dales &middot; <a href="https://www.cringleycottage.com/" style="color:#5e7a52;text-decoration:underline;">www.cringleycottage.com</a></p>
       <p style="margin:0;font-family:Georgia,serif;font-size:12px;color:#a39a89;">You're receiving this because you opted in when booking with us. Reply "unsubscribe" any time and we'll remove you.</p>
     </td></tr></table>
   </td></tr>

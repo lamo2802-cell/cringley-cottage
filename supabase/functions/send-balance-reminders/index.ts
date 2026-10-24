@@ -11,7 +11,7 @@ const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
 const SYNC_SECRET = Deno.env.get("SYNC_SECRET");
 const REMINDER_WINDOW_DAYS = 7;
 const FROM_EMAIL = "Cringley Cottage <hello@cringleycottage.com>";
-const SITE_BASE_URL = "https://lamo2802-cell.github.io/cringley-cottage/";
+const SITE_BASE_URL = "https://www.cringleycottage.com/";
 
 function money(n: number): string { return "£" + Number(n).toFixed(2).replace(/\.00$/, ""); }
 function fmtDate(d: string): string {
@@ -36,7 +36,7 @@ function emailShell(bodyHtml: string): string {
   <tr><td style="padding:36px 40px 8px;">${bodyHtml}</td></tr>
   <tr><td style="padding:28px 40px 32px;">
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td style="border-top:1px solid #e5ddd0;padding-top:20px;">
-      <p style="margin:0 0 4px;font-family:Georgia,serif;font-size:13px;color:#7a6f60;">Cringley Cottage &middot; Askrigg &middot; Yorkshire Dales</p>
+      <p style="margin:0 0 4px;font-family:Georgia,serif;font-size:13px;color:#7a6f60;">Cringley Cottage &middot; Askrigg &middot; Yorkshire Dales &middot; <a href="https://www.cringleycottage.com/" style="color:#5e7a52;text-decoration:underline;">www.cringleycottage.com</a></p>
       <p style="margin:0;font-family:Georgia,serif;font-size:12px;color:#a39a89;">Questions? Just reply to this email &mdash; we read every message.</p>
     </td></tr></table>
   </td></tr>

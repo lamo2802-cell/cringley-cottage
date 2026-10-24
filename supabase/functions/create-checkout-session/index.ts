@@ -84,6 +84,14 @@ Deno.serve(async (req: Request) => {
       "metadata[booking_id]": booking.id,
       "metadata[purpose]": payPurpose,
     };
+    // Copy the description and ids onto the underlying payment too, so the
+    // Stripe dashboard's Payments list (and payout reports) show what each
+    // payment was for. A deposit has no booking ref yet — stripe-webhook adds
+    // it once the payment lands.
+    params["payment_intent_data[description]"] = description;
+    params["payment_intent_data[metadata][booking_id]"] = booking.id;
+    params["payment_intent_data[metadata][purpose]"] = payPurpose;
+    if (booking.booking_ref) params["payment_intent_data[metadata][booking_ref]"] = booking.booking_ref;
     if (booking.guest_email) params.customer_email = booking.guest_email;
 
     const stripeRes = await fetch("https://api.stripe.com/v1/checkout/sessions", {

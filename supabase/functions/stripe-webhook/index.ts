@@ -10,10 +10,11 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const STRIPE_WEBHOOK_SECRET = Deno.env.get("STRIPE_WEBHOOK_SECRET");
+const STRIPE_SECRET_KEY = Deno.env.get("STRIPE_SECRET_KEY");
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
 const FROM_EMAIL = "Cringley Cottage <hello@cringleycottage.com>";
 const OWNER_EMAILS = ["lamo2802@gmail.com", "rpeacey987@gmail.com"];
-const SITE_BASE_URL = "https://lamo2802-cell.github.io/cringley-cottage/";
+const SITE_BASE_URL = "https://www.cringleycottage.com/";
 
 async function verifyStripeSignature(payload: string, sigHeader: string, secret: string): Promise<boolean> {
   const parts = Object.fromEntries(sigHeader.split(",").map(p => p.split("=")) as [string, string][]);
@@ -67,7 +68,7 @@ function emailShell(bodyHtml: string): string {
   <tr><td style="padding:36px 40px 8px;">${bodyHtml}</td></tr>
   <tr><td style="padding:28px 40px 32px;">
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td style="border-top:1px solid #e5ddd0;padding-top:20px;">
-      <p style="margin:0 0 4px;font-family:Georgia,serif;font-size:13px;color:#7a6f60;">Cringley Cottage &middot; Askrigg &middot; Yorkshire Dales</p>
+      <p style="margin:0 0 4px;font-family:Georgia,serif;font-size:13px;color:#7a6f60;">Cringley Cottage &middot; Askrigg &middot; Yorkshire Dales &middot; <a href="https://www.cringleycottage.com/" style="color:#5e7a52;text-decoration:underline;">www.cringleycottage.com</a></p>
       <p style="margin:0;font-family:Georgia,serif;font-size:12px;color:#a39a89;">Questions? Just reply to this email &mdash; we read every message.</p>
     </td></tr></table>
   </td></tr>
@@ -96,6 +97,23 @@ function button(text: string, url: string): string {
   return `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:22px 0 8px;"><tr><td style="background:#5e7a52;border-radius:3px;">
     <a href="${url}" style="display:inline-block;padding:13px 28px;font-family:'Helvetica Neue',Arial,sans-serif;font-size:13px;letter-spacing:0.5px;text-transform:uppercase;color:#ffffff;text-decoration:none;">${text}</a>
   </td></tr></table>`;
+}
+
+// The booking ref (CC-YYYY-NNNN) is only assigned once the first payment
+// lands, so it can't be put on the Stripe payment when checkout starts.
+// Stamp it on afterwards so the payment can be found by booking ref in the
+// Stripe dashboard and matched to the Zoho invoice. Best-effort — a failure
+// here must never block confirming the booking.
+async function tagStripePayment(paymentIntentId: string, ref: string, description: string) {
+  if (!STRIPE_SECRET_KEY || !paymentIntentId.startsWith("pi_")) return;
+  try {
+    const body = new URLSearchParams({ description, "metadata[booking_ref]": ref });
+    await fetch(`https://api.stripe.com/v1/payment_intents/${paymentIntentId}`, {
+      method: "POST",
+      headers: { "Authorization": `Bearer ${STRIPE_SECRET_KEY}`, "Content-Type": "application/x-www-form-urlencoded" },
+      body,
+    });
+  } catch { /* best-effort */ }
 }
 
 async function sendEmail(to: string | string[], subject: string, html: string) {
@@ -183,6 +201,8 @@ Deno.serve(async (req: Request) => {
           await supabase.from("bookings").update(updates).eq("id", bookingId);
 
           const ref = (updates.booking_ref as string) || booking.booking_ref;
+          const paymentKind = purpose === "balance" ? "Balance" : (booking.payment_type === "full" ? "Full payment" : "Deposit");
+          if (ref) await tagStripePayment(paymentIntentId, ref, `${paymentKind} — Cringley Cottage ${ref}, ${booking.checkin} to ${booking.checkout}`);
           const outstanding = Math.max(0, Math.round(((booking.total_amount || 0) - newAmountPaid) * 100) / 100);
           const manageUrl = `${SITE_BASE_URL}pay-balance.html`;
           const guestInfoUrl = `${SITE_BASE_URL}guest-info.html`;
@@ -231,7 +251,8 @@ Deno.serve(async (req: Request) => {
             + infoRow("Dog", booking.has_dog ? "Yes" : "No")
             + infoRow("Address", escapeHtml([booking.address_line1, booking.address_line2, booking.city, booking.postcode, booking.country].filter(Boolean).join(", ")))
             + (booking.discount_amount > 0 ? infoRow("Discount code", `${escapeHtml(booking.discount_code)} (${money(booking.discount_amount)} off)`) : "")
-            + infoRow("Payment just made", money(paidAmount))
+            + infoRow("Payment just made", `${money(paidAmount)} (${paymentKind})`)
+            + infoRow("Stripe payment ID", escapeHtml(paymentIntentId))
             + infoRow("Total paid so far", money(newAmountPaid))
             + infoRow("Total cost", money(booking.total_amount), true)
             + (booking.message ? infoRow("Message", escapeHtml(booking.message)) : "");

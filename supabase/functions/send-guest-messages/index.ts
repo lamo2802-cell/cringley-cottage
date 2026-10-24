@@ -16,6 +16,7 @@ const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
 const SYNC_SECRET = Deno.env.get("SYNC_SECRET");
 const FROM_EMAIL = "Cringley Cottage <hello@cringleycottage.com>";
+const SITE_BASE_URL = "https://www.cringleycottage.com/";
 
 function fmtDate(d: string): string {
   return new Date(d + "T00:00:00").toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
@@ -34,7 +35,7 @@ function emailShell(bodyHtml: string): string {
   <tr><td style="padding:36px 40px 8px;">${bodyHtml}</td></tr>
   <tr><td style="padding:28px 40px 32px;">
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td style="border-top:1px solid #e5ddd0;padding-top:20px;">
-      <p style="margin:0 0 4px;font-family:Georgia,serif;font-size:13px;color:#7a6f60;">Cringley Cottage &middot; Askrigg &middot; Yorkshire Dales</p>
+      <p style="margin:0 0 4px;font-family:Georgia,serif;font-size:13px;color:#7a6f60;">Cringley Cottage &middot; Askrigg &middot; Yorkshire Dales &middot; <a href="https://www.cringleycottage.com/" style="color:#5e7a52;text-decoration:underline;">www.cringleycottage.com</a></p>
       <p style="margin:0;font-family:Georgia,serif;font-size:12px;color:#a39a89;">Questions? Just reply to this email &mdash; we read every message.</p>
     </td></tr></table>
   </td></tr>
@@ -58,6 +59,11 @@ function infoBox(rows: string): string {
   return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f3f0e8;border-radius:4px;margin:4px 0 18px;">
     <tr><td style="padding:18px 20px;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0">${rows}</table></td></tr>
   </table>`;
+}
+function button(text: string, url: string): string {
+  return `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:22px 0 8px;"><tr><td style="background:#5e7a52;border-radius:3px;">
+    <a href="${url}" style="display:inline-block;padding:13px 28px;font-family:'Helvetica Neue',Arial,sans-serif;font-size:13px;letter-spacing:0.5px;text-transform:uppercase;color:#ffffff;text-decoration:none;">${text}</a>
+  </td></tr></table>`;
 }
 function escapeHtml(s: string): string {
   return (s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -146,7 +152,8 @@ Deno.serve(async (req: Request) => {
             infoRow("Booking reference", b.booking_ref || "—", true) +
             infoRow("Check-in", fmtDate(b.checkin))
           ) +
-          freeTextToHtml(checkinText)
+          freeTextToHtml(checkinText) +
+          button("View guest information", `${SITE_BASE_URL}guest-info.html`)
         );
         await sendEmail(b.guest_email, `Check-in Today — Cringley Cottage`, html);
         await supabase.from("bookings").update({ checkin_email_sent_at: new Date().toISOString() }).eq("id", b.id);
