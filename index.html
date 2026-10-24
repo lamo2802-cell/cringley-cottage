@@ -1285,6 +1285,11 @@
             <span style="font-size:0.82rem;line-height:1.5;">I'd like to receive occasional offers and updates from Cringley Cottage by email. (Optional — you can unsubscribe any time.)</span>
           </label>
 
+          <label for="bpTermsAccepted" style="margin:0 0 1rem;display:flex;align-items:flex-start;gap:0.7rem;background:rgba(247,242,234,0.05);border:1px solid rgba(247,242,234,0.12);border-radius:2px;padding:0.75rem 0.9rem;cursor:pointer;color:var(--cream);">
+            <input type="checkbox" id="bpTermsAccepted" required style="width:20px;height:20px;flex-shrink:0;margin-top:0.1rem;accent-color:var(--sage);cursor:pointer;">
+            <span style="font-size:0.82rem;line-height:1.5;">I have read and accept the <a href="terms.html" target="_blank" rel="noopener" style="color:var(--cream);">Terms &amp; Conditions</a>, including the non-refundable deposit. See our <a href="privacy.html" target="_blank" rel="noopener" style="color:var(--cream);">Privacy Notice</a> for how we use your details.</span>
+          </label>
+
           <button type="submit" class="bp-submit" id="bpFinalSubmit">Continue to Payment</button>
           <p class="bp-small" id="bpPaymentNote">25% deposit to secure &middot; balance due before arrival</p>
         </form>
@@ -1348,6 +1353,7 @@
   </div>
   <div class="footer-links" style="flex-basis:100%;padding-top:0.75rem;border-top:1px solid rgba(247,242,234,0.07);">
     <a href="terms.html">Terms &amp; Conditions</a>
+    <a href="privacy.html">Privacy</a>
     <a href="admin.html" style="font-size:0.68rem;opacity:0.5;">Admin</a>
   </div>
   <div class="footer-copy">
@@ -2125,6 +2131,7 @@
       country: document.getElementById('bpCountry').value,
       has_dog: document.getElementById('bpHasDog').checked,
       marketing_consent: document.getElementById('bpMarketingConsent').checked,
+      terms_accepted: document.getElementById('bpTermsAccepted').checked,
       adults,
       children,
       message: document.getElementById('bpMessage').value,
