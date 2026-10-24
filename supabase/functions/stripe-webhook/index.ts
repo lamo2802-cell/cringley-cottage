@@ -100,6 +100,29 @@ function button(text: string, url: string): string {
   </td></tr></table>`;
 }
 
+// What every guest needs for the stay itself, kept the same in every
+// confirmation: times, where the cottage is, parking, and the terms.
+const TERMS_URL = `${SITE_BASE_URL}terms.html`;
+function stayDetailsBox(): string {
+  return infoBox(
+    infoRow("Check-in", "From 3pm") +
+    infoRow("Check-out", "By 10am") +
+    infoRow("Address", "Cringley Cottage, Silver Street,<br>Askrigg, Leyburn DL8 3HS") +
+    infoRow("Parking", "On-street in the village, or Parkins Garth car park at the village entrance")
+  );
+}
+function nightsBetween(checkin: string, checkout: string): number {
+  return Math.round((new Date(checkout + "T00:00:00").getTime() - new Date(checkin + "T00:00:00").getTime()) / 86400000);
+}
+function guestsLabel(total: number | null, children: number | null): string {
+  const kids = Math.max(0, Number(children) || 0);
+  const adults = Math.max(0, (Number(total) || 0) - kids);
+  if (!adults && !kids) return "";
+  const parts = [`${adults} adult${adults === 1 ? "" : "s"}`];
+  if (kids > 0) parts.push(`${kids} child${kids === 1 ? "" : "ren"}`);
+  return parts.join(", ");
+}
+
 // The booking ref (CC-YYYY-NNNN) is only assigned once the first payment
 // lands, so it can't be put on the Stripe payment when checkout starts.
 // Stamp it on afterwards so the payment can be found by booking ref in the
@@ -272,7 +295,7 @@ Deno.serve(async (req: Request) => {
   const paymentKind = purpose === "balance" ? "Balance" : (booking.payment_type === "full" ? "Full payment" : "Deposit");
   if (ref) await tagStripePayment(paymentIntentId, ref, `${paymentKind} — Cringley Cottage ${ref}, ${booking.checkin} to ${booking.checkout}`);
   const outstanding = Math.max(0, Math.round(((booking.total_amount || 0) - newAmountPaid) * 100) / 100);
-  const manageUrl = `${SITE_BASE_URL}pay-balance.html`;
+  const manageUrl = `${SITE_BASE_URL}pay-balance.html${ref ? `?ref=${encodeURIComponent(ref)}` : ""}`;
   const guestInfoUrl = `${SITE_BASE_URL}guest-info.html`;
 
   let guestEmailOk = true;
@@ -281,9 +304,14 @@ Deno.serve(async (req: Request) => {
     let subject: string;
     if (purpose === "initial") {
       subject = `Booking Confirmed — ${ref}`;
+      const nights = nightsBetween(booking.checkin, booking.checkout);
+      const guests = guestsLabel(booking.guests_count, booking.children_count);
       let rows = infoRow("Booking reference", escapeHtml(ref), true)
         + infoRow("Dates", dates)
-        + (booking.discount_amount > 0 ? infoRow("Discount applied", `${money(booking.discount_amount)} (${escapeHtml(booking.discount_code)})`) : "")
+        + infoRow("Nights", String(nights))
+        + (guests ? infoRow("Guests", guests) : "")
+        + infoRow("Dog", booking.has_dog ? "Yes" : "No")
+        + (booking.discount_amount > 0 ? infoRow("Discount applied", `&minus;${money(booking.discount_amount)} (${escapeHtml(booking.discount_code)})`) : "")
         + infoRow("Total cost", money(booking.total_amount))
         + infoRow("Paid today", money(paidAmount));
       if (outstanding > 0) rows += infoRow("Balance due", `${money(outstanding)} by ${fmtDate(booking.balance_due_date)}`, true);
@@ -293,19 +321,35 @@ Deno.serve(async (req: Request) => {
         para("Thank you — your booking at Cringley Cottage is confirmed!") +
         infoBox(rows) +
         (outstanding > 0
-          ? para(`You can pay the remaining balance any time before then at <a href="${manageUrl}" style="color:#5e7a52;">${manageUrl}</a> using your booking reference and email.`)
+          ? para(`You can pay the remaining balance any time before ${fmtDate(booking.balance_due_date)}. We'll send you a reminder about a week before.`) +
+            button("Pay your balance", manageUrl)
           : para("Your stay is paid in full — nothing more to do!")) +
-        para(`We look forward to welcoming you to Cringley Cottage! Check-in is from <strong>3pm</strong>.`) +
+        stayDetailsBox() +
+        para(`Your booking is made under our <a href="${TERMS_URL}" style="color:#5e7a52;">booking terms</a>, including the cancellation policy. We'll email your key-safe code on the morning you arrive.`) +
+        para("We look forward to welcoming you to Cringley Cottage!") +
         button("View guest information", guestInfoUrl)
       );
     } else {
-      subject = `Balance Paid — ${ref}`;
+      // Normally the guest pays everything that's left, but say what's
+      // true if a smaller amount came through (or the price changed since).
+      const paidInFull = outstanding <= 0;
+      subject = paidInFull ? `Paid in Full — ${ref}` : `Payment Received — ${ref}`;
       guestHtml = emailShell(
-        heading("Balance received") +
+        heading(paidInFull ? "Thank you, you're all paid" : "Payment received") +
         para(`Dear ${escapeHtml(booking.guest_first_name) || "there"},`) +
-        para(`Thank you — we've received your balance payment of <strong>${money(paidAmount)}</strong>. Your booking is now paid in full.`) +
-        infoBox(infoRow("Booking reference", escapeHtml(ref), true) + infoRow("Status", "Paid in full", true)) +
-        para(`We look forward to welcoming you to Cringley Cottage! Check-in is from <strong>3pm</strong>.`) +
+        para(paidInFull
+          ? `Thank you — we've received your payment of <strong>${money(paidAmount)}</strong>, so your stay is now paid in full. There's nothing more to pay.`
+          : `Thank you — we've received your payment of <strong>${money(paidAmount)}</strong>. There's still <strong>${money(outstanding)}</strong> left to pay${booking.balance_due_date ? ` by ${fmtDate(booking.balance_due_date)}` : ""}.`) +
+        infoBox(
+          infoRow("Booking reference", escapeHtml(ref), true) +
+          infoRow("Dates", dates) +
+          infoRow("Total cost", money(booking.total_amount)) +
+          infoRow("Paid so far", money(newAmountPaid)) +
+          infoRow(paidInFull ? "Status" : "Still to pay", paidInFull ? "Paid in full" : money(outstanding), true)
+        ) +
+        (paidInFull ? "" : button("Pay the rest", manageUrl)) +
+        stayDetailsBox() +
+        para("We'll email your key-safe code on the morning you arrive. We look forward to welcoming you to Cringley Cottage!") +
         button("View guest information", guestInfoUrl)
       );
     }

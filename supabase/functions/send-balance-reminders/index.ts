@@ -130,7 +130,7 @@ Deno.serve(async (req: Request) => {
       const outstanding = Math.max(0, Math.round(((booking.total_amount || 0) - (booking.amount_paid || 0)) * 100) / 100);
       if (outstanding <= 0 || !booking.guest_email) continue;
 
-      const manageUrl = `${SITE_BASE_URL}pay-balance.html`;
+      const manageUrl = `${SITE_BASE_URL}pay-balance.html?ref=${encodeURIComponent(booking.booking_ref || "")}`;
       const html = emailShell(
         heading("Balance due soon") +
         para(`Dear ${escapeHtml(booking.guest_first_name) || "there"},`) +
@@ -138,9 +138,11 @@ Deno.serve(async (req: Request) => {
         infoBox(
           infoRow("Booking reference", booking.booking_ref, true) +
           infoRow("Dates", `${fmtDate(booking.checkin)} &rarr; ${fmtDate(booking.checkout)}`) +
+          infoRow("Total cost", money(booking.total_amount || 0)) +
+          infoRow("Already paid", money(booking.amount_paid || 0)) +
           infoRow("Balance due", `${money(outstanding)} by ${fmtDate(booking.balance_due_date)}`, true)
         ) +
-        para("You can pay any time before then using your booking reference and email.") +
+        para("The button below takes you straight to your booking. You'll just need to enter the email address you booked with.") +
         para("We look forward to welcoming you!") +
         button("Pay your balance", manageUrl)
       );

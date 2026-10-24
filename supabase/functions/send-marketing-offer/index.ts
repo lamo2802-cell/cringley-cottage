@@ -10,6 +10,10 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
 // "to" always a single address) so recipients never see each other's
 // contact details — no shared "to"/"cc" list.
 //
+// Every email carries its own unsubscribe link and the List-Unsubscribe
+// headers, so Gmail/Apple Mail can show their one-click unsubscribe button.
+// Both go to the unsubscribe function, which checks the token made here.
+//
 // dry_run: true returns the recipient count only, with nothing sent — the
 // admin UI uses this to show a confirmation ("this will go to N people")
 // before the real send.
@@ -19,6 +23,21 @@ const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
 const FROM_EMAIL = "Cringley Cottage <hello@cringleycottage.com>";
+const SITE_BASE_URL = "https://www.cringleycottage.com/";
+
+function b64urlEncode(s: string): string {
+  return btoa(String.fromCharCode(...new TextEncoder().encode(s))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+async function hmacHex(message: string): Promise<string> {
+  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(SERVICE_ROLE_KEY), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  const sig = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(message));
+  return Array.from(new Uint8Array(sig)).map(b => b.toString(16).padStart(2, "0")).join("");
+}
+// Must match emailFromToken() in the unsubscribe function.
+async function unsubscribeToken(email: string): Promise<string> {
+  const normalised = email.trim().toLowerCase();
+  return `${b64urlEncode(normalised)}.${(await hmacHex(`unsubscribe:${normalised}`)).slice(0, 32)}`;
+}
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
@@ -26,7 +45,7 @@ const CORS_HEADERS = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-function emailShell(bodyHtml: string): string {
+function emailShell(bodyHtml: string, unsubscribeUrl: string): string {
   return `<!DOCTYPE html><html><head><meta charset="UTF-8"></head>
   <body style="margin:0;padding:0;background:#e9e3d6;">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#e9e3d6;padding:32px 16px;"><tr><td align="center">
@@ -40,7 +59,7 @@ function emailShell(bodyHtml: string): string {
   <tr><td style="padding:28px 40px 32px;">
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td style="border-top:1px solid #e5ddd0;padding-top:20px;">
       <p style="margin:0 0 4px;font-family:Georgia,serif;font-size:13px;color:#7a6f60;">Cringley Cottage &middot; Askrigg &middot; Yorkshire Dales &middot; <a href="https://www.cringleycottage.com/" style="color:#5e7a52;text-decoration:underline;">www.cringleycottage.com</a></p>
-      <p style="margin:0;font-family:Georgia,serif;font-size:12px;color:#a39a89;">You're receiving this because you opted in when booking with us. Reply "unsubscribe" any time and we'll remove you.</p>
+      <p style="margin:0;font-family:Georgia,serif;font-size:12px;color:#a39a89;">You're receiving this because you opted in when booking with us. <a href="${unsubscribeUrl}" style="color:#a39a89;text-decoration:underline;">Unsubscribe</a> any time, or just reply "unsubscribe".</p>
     </td></tr></table>
   </td></tr>
   </table></td></tr></table></body></html>`;
@@ -66,13 +85,19 @@ function freeTextToHtml(text: string): string {
   }).join("");
 }
 
-async function sendEmail(to: string, subject: string, html: string) {
+async function sendEmail(to: string, subject: string, html: string, oneClickUrl: string) {
   if (!RESEND_API_KEY) return;
   try {
     await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: { "Authorization": `Bearer ${RESEND_API_KEY}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ from: FROM_EMAIL, to, subject, html }),
+      body: JSON.stringify({
+        from: FROM_EMAIL, to, subject, html,
+        headers: {
+          "List-Unsubscribe": `<${oneClickUrl}>, <mailto:hello@cringleycottage.com?subject=unsubscribe>`,
+          "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+        },
+      }),
     });
   } catch { /* best-effort */ }
 }
@@ -134,12 +159,14 @@ Deno.serve(async (req: Request) => {
     // so no recipient ever sees another's contact details.
     let sent = 0;
     for (const r of recipients) {
+      const token = await unsubscribeToken(r.email);
       const html = emailShell(
-        heading(subject) +
+        heading(escapeHtml(subject)) +
         para(`Dear ${escapeHtml(r.first_name)},`) +
-        freeTextToHtml(body)
+        freeTextToHtml(body),
+        `${SITE_BASE_URL}unsubscribe.html?t=${encodeURIComponent(token)}`,
       );
-      await sendEmail(r.email, subject, html);
+      await sendEmail(r.email, subject, html, `${SUPABASE_URL}/functions/v1/unsubscribe?t=${encodeURIComponent(token)}`);
       sent++;
     }
 

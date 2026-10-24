@@ -181,7 +181,7 @@ Deno.serve(async (req: Request) => {
               infoRow("Balance to pay", money(outstanding), true)
             ) +
             para("As soon as it's paid, your check-in details will arrive by email automatically. If you think this is a mistake, just reply to this email.") +
-            button("Pay your balance", `${SITE_BASE_URL}pay-balance.html`)
+            button("Pay your balance", `${SITE_BASE_URL}pay-balance.html${b.booking_ref ? `?ref=${encodeURIComponent(b.booking_ref)}` : ""}`)
           ), b.id);
           await sendEmail(OWNER_EMAILS, `Unpaid balance for today's arrival — ${b.booking_ref}`, emailShell(
             heading("Guest arriving today hasn't paid") +
@@ -203,8 +203,11 @@ Deno.serve(async (req: Request) => {
           heading("You're checking in today!") +
           para(`Dear ${escapeHtml(b.guest_first_name) || "there"},`) +
           infoBox(
-            infoRow("Booking reference", b.booking_ref || "—", true) +
-            infoRow("Check-in", fmtDate(b.checkin))
+            infoRow("Booking reference", escapeHtml(b.booking_ref) || "—", true) +
+            infoRow("Check-in", `${fmtDate(b.checkin)}, from 3pm`) +
+            infoRow("Check-out", `${fmtDate(b.checkout)}, by 10am`) +
+            infoRow("Address", "Silver Street, Askrigg, DL8 3HS") +
+            infoRow("Parking", "On-street in the village, or Parkins Garth car park at the village entrance")
           ) +
           freeTextToHtml(checkinText) +
           button("View guest information", `${SITE_BASE_URL}guest-info.html`)
@@ -237,10 +240,12 @@ Deno.serve(async (req: Request) => {
           heading("Checking out tomorrow") +
           para(`Dear ${escapeHtml(b.guest_first_name) || "there"},`) +
           infoBox(
-            infoRow("Booking reference", b.booking_ref || "—", true) +
-            infoRow("Check-out", fmtDate(b.checkout))
+            infoRow("Booking reference", escapeHtml(b.booking_ref) || "—", true) +
+            infoRow("Check-out", `${fmtDate(b.checkout)}, by 10am`)
           ) +
-          freeTextToHtml(checkoutText)
+          freeTextToHtml(checkoutText) +
+          para("If you've enjoyed your stay, we'd be so grateful for a few words about it. Just reply to this email, and with your OK we may share it on our website. It really helps a small cottage like ours.") +
+          button("View guest information", `${SITE_BASE_URL}guest-info.html`)
         );
         await sendEmail(b.guest_email, `Checking Out Tomorrow — Cringley Cottage`, html, b.id);
         await supabase.from("bookings").update({ checkout_email_sent_at: new Date().toISOString() }).eq("id", b.id);
