@@ -424,6 +424,8 @@
     display: flex; align-items: center; justify-content: center;
   }
   .g-cell:hover .overlay { background: rgba(10,8,5,0.35); }
+  .g-cell:focus-visible { outline: 2px solid var(--sage-light); outline-offset: 2px; }
+  .g-cell:focus-visible .overlay { background: rgba(10,8,5,0.35); }
   .g-zoom {
     color: #fff; font-size: 1.6rem; opacity: 0;
     transition: opacity 0.3s; pointer-events: none;
@@ -929,8 +931,8 @@
 
 <!-- HERO -->
 <section id="hero">
-  <video class="hero-bg" autoplay muted playsinline preload="none" poster="front-of-house.jpg" id="heroVideo" width="1920" height="1080">
-    <source src="cottage-video.mp4" type="video/mp4">
+  <video class="hero-bg" muted playsinline preload="none" poster="front-of-house.jpg" id="heroVideo" width="720" height="1280">
+    <source data-src="cottage-video-720.mp4" type="video/mp4">
   </video>
   <div class="hero-overlay"></div>
   <div class="hero-content">
@@ -1040,17 +1042,17 @@
 
   <!-- Thumbnail grid — click opens lightbox -->
   <div class="gallery-grid">
-    <div class="g-cell" onclick="openLightbox(0)"><img src="IMG_1423.jpg"      alt="Cringley Cottage in winter snow"><div class="overlay"><span class="g-zoom">&#x2B26;</span></div></div>
-    <div class="g-cell" onclick="openLightbox(1)"><img loading="lazy" src="413188738.jpg"     alt="Cringley Cottage exterior in summer"><div class="overlay"><span class="g-zoom">&#x2B26;</span></div></div>
-    <div class="g-cell" onclick="openLightbox(2)"><img loading="lazy" src="garden.jpg"        alt="Aerial view of Askrigg village and the dale"><div class="overlay"><span class="g-zoom">&#x2B26;</span></div></div>
-    <div class="g-cell" onclick="openLightbox(3)"><img loading="lazy" src="416725514.jpg"     alt="Dining room and log burning stove"><div class="overlay"><span class="g-zoom">&#x2B26;</span></div></div>
-    <div class="g-cell" onclick="openLightbox(4)"><img loading="lazy" src="416725784.jpg"     alt="Living room with beamed ceiling"><div class="overlay"><span class="g-zoom">&#x2B26;</span></div></div>
-    <div class="g-cell" onclick="openLightbox(5)"><img loading="lazy" src="416724818.jpg"     alt="Dining table under the beams"><div class="overlay"><span class="g-zoom">&#x2B26;</span></div></div>
-    <div class="g-cell" onclick="openLightbox(6)"><img loading="lazy" src="416655321.jpg"     alt="Cottage door detail"><div class="overlay"><span class="g-zoom">&#x2B26;</span></div></div>
-    <div class="g-cell" onclick="openLightbox(7)"><img loading="lazy" src="416658990.jpg"     alt="Cosy reading corner"><div class="overlay"><span class="g-zoom">&#x2B26;</span></div></div>
-    <div class="g-cell" onclick="openLightbox(8)"><img loading="lazy" src="416657903.jpg"     alt="Bedroom welcome touches"><div class="overlay"><span class="g-zoom">&#x2B26;</span></div></div>
-    <div class="g-cell" onclick="openLightbox(9)"><img loading="lazy" src="413188799.jpg"     alt="Bathroom"><div class="overlay"><span class="g-zoom">&#x2B26;</span></div></div>
-    <div class="g-cell" onclick="openLightbox(10)"><img loading="lazy" src="moorland.jpg"    alt="Private garden"><div class="overlay"><span class="g-zoom">&#x2B26;</span></div></div>
+    <div class="g-cell" role="button" tabindex="0" onclick="openLightbox(0)"><img loading="lazy" src="IMG_1423.jpg"      alt="Cringley Cottage in winter snow"><div class="overlay"><span class="g-zoom">&#x2B26;</span></div></div>
+    <div class="g-cell" role="button" tabindex="0" onclick="openLightbox(1)"><img loading="lazy" src="413188738.jpg"     alt="Cringley Cottage exterior in summer"><div class="overlay"><span class="g-zoom">&#x2B26;</span></div></div>
+    <div class="g-cell" role="button" tabindex="0" onclick="openLightbox(2)"><img loading="lazy" src="garden.jpg"        alt="Aerial view of Askrigg village and the dale"><div class="overlay"><span class="g-zoom">&#x2B26;</span></div></div>
+    <div class="g-cell" role="button" tabindex="0" onclick="openLightbox(3)"><img loading="lazy" src="416725514.jpg"     alt="Dining room and log burning stove"><div class="overlay"><span class="g-zoom">&#x2B26;</span></div></div>
+    <div class="g-cell" role="button" tabindex="0" onclick="openLightbox(4)"><img loading="lazy" src="416725784.jpg"     alt="Living room with beamed ceiling"><div class="overlay"><span class="g-zoom">&#x2B26;</span></div></div>
+    <div class="g-cell" role="button" tabindex="0" onclick="openLightbox(5)"><img loading="lazy" src="416724818.jpg"     alt="Dining table under the beams"><div class="overlay"><span class="g-zoom">&#x2B26;</span></div></div>
+    <div class="g-cell" role="button" tabindex="0" onclick="openLightbox(6)"><img loading="lazy" src="416655321.jpg"     alt="Cottage door detail"><div class="overlay"><span class="g-zoom">&#x2B26;</span></div></div>
+    <div class="g-cell" role="button" tabindex="0" onclick="openLightbox(7)"><img loading="lazy" src="416658990.jpg"     alt="Cosy reading corner"><div class="overlay"><span class="g-zoom">&#x2B26;</span></div></div>
+    <div class="g-cell" role="button" tabindex="0" onclick="openLightbox(8)"><img loading="lazy" src="416657903.jpg"     alt="Bedroom welcome touches"><div class="overlay"><span class="g-zoom">&#x2B26;</span></div></div>
+    <div class="g-cell" role="button" tabindex="0" onclick="openLightbox(9)"><img loading="lazy" src="413188799.jpg"     alt="Bathroom"><div class="overlay"><span class="g-zoom">&#x2B26;</span></div></div>
+    <div class="g-cell" role="button" tabindex="0" onclick="openLightbox(10)"><img loading="lazy" src="moorland.jpg"    alt="Private garden"><div class="overlay"><span class="g-zoom">&#x2B26;</span></div></div>
   </div>
 </section>
 
@@ -1173,17 +1175,17 @@
         <p class="bp-sub">Owner managed · Book instantly online</p>
         <div class="bp-row">
           <div class="bp-field">
-            <label>Check-in</label>
+            <label for="bpCheckin">Check-in</label>
             <input type="date" id="bpCheckin" min="">
           </div>
           <div class="bp-field">
-            <label>Check-out</label>
+            <label for="bpCheckout">Check-out</label>
             <input type="date" id="bpCheckout" min="">
           </div>
         </div>
         <div class="bp-row" style="margin-bottom:0.75rem">
           <div class="bp-field">
-            <label>Adults</label>
+            <label for="bpAdults">Adults</label>
             <select id="bpAdults">
               <option value="1">1 Adult</option>
               <option value="2" selected>2 Adults</option>
@@ -1192,7 +1194,7 @@
             </select>
           </div>
           <div class="bp-field">
-            <label>Children</label>
+            <label for="bpChildren">Children</label>
             <select id="bpChildren">
               <option value="0" selected>0 Children</option>
               <option value="1">1 Child</option>
@@ -1228,44 +1230,44 @@
           <p style="font-size:0.75rem;text-transform:uppercase;letter-spacing:0.08em;color:rgba(247,242,234,0.5);margin-bottom:0.6rem;">Lead guest</p>
           <div class="bp-row">
             <div class="bp-field">
-              <label>First name *</label>
+              <label for="bpFirstName">First name *</label>
               <input type="text" id="bpFirstName" required placeholder="Jane">
             </div>
             <div class="bp-field">
-              <label>Last name *</label>
+              <label for="bpLastName">Last name *</label>
               <input type="text" id="bpLastName" required placeholder="Smith">
             </div>
           </div>
           <div class="bp-field" style="margin-bottom:0.75rem">
-            <label>Email *</label>
+            <label for="bpEmail">Email *</label>
             <input type="email" id="bpEmail" required placeholder="jane@example.com">
           </div>
           <div class="bp-field" style="margin-bottom:0.75rem">
-            <label>Phone</label>
+            <label for="bpPhone">Phone</label>
             <input type="tel" id="bpPhone" placeholder="+44 7700 900000">
           </div>
 
           <p style="font-size:0.75rem;text-transform:uppercase;letter-spacing:0.08em;color:rgba(247,242,234,0.5);margin:1rem 0 0.6rem;">Home address</p>
           <div class="bp-field" style="margin-bottom:0.75rem">
-            <label>Address line 1 *</label>
+            <label for="bpAddr1">Address line 1 *</label>
             <input type="text" id="bpAddr1" required placeholder="123 High Street">
           </div>
           <div class="bp-field" style="margin-bottom:0.75rem">
-            <label>Address line 2</label>
+            <label for="bpAddr2">Address line 2</label>
             <input type="text" id="bpAddr2" placeholder="">
           </div>
           <div class="bp-row">
             <div class="bp-field">
-              <label>City *</label>
+              <label for="bpCity">City *</label>
               <input type="text" id="bpCity" required placeholder="Leeds">
             </div>
             <div class="bp-field">
-              <label>Postcode *</label>
+              <label for="bpPostcode">Postcode *</label>
               <input type="text" id="bpPostcode" required placeholder="LS1 1AA">
             </div>
           </div>
           <div class="bp-field" style="margin-bottom:0.75rem">
-            <label>Country</label>
+            <label for="bpCountry">Country</label>
             <input type="text" id="bpCountry" value="United Kingdom">
           </div>
 
@@ -1276,7 +1278,7 @@
           </label>
 
           <div class="bp-field" style="margin-bottom:1rem">
-            <label>Anything to tell us?</label>
+            <label for="bpMessage">Anything to tell us?</label>
             <textarea id="bpMessage" rows="3" placeholder="Special requirements, questions..." style="background:rgba(247,242,234,0.07);border:1px solid rgba(247,242,234,0.12);color:var(--cream);padding:0.65rem 0.85rem;font-family:'DM Sans',sans-serif;font-size:0.85rem;border-radius:2px;width:100%;resize:vertical;outline:none;transition:border-color 0.2s;"></textarea>
           </div>
 
@@ -1419,6 +1421,19 @@
     return `${y}-${m}-${d}`;
   }
 
+  // "2026-10-24" as local midnight. new Date("2026-10-24") is UTC midnight,
+  // which is the evening before for anyone west of the UK.
+  function parseLocalDate(s) {
+    const [y, m, d] = s.split('-').map(Number);
+    return new Date(y, m - 1, d);
+  }
+
+  // Whole pounds as "£120", anything with pence as "£120.50".
+  function fmtGBP(n) {
+    const r = Math.round(n * 100) / 100;
+    return '£' + (Number.isInteger(r) ? String(r) : r.toFixed(2));
+  }
+
   function getRateEntry(date) {
     const d = toLocalISODate(date);
     return RATES.find(r => d >= r.from && d <= r.to) || { rate: 120, minNights: 2 };
@@ -1459,7 +1474,9 @@
       buildCal();
       if (statusEl) statusEl.textContent = 'Availability up to date ✓';
     } catch(e) {
-      if (statusEl) statusEl.textContent = 'Select your dates to check availability';
+      // Without the bookings every date would look free, so say so rather
+      // than show a calendar that can't be trusted.
+      if (statusEl) statusEl.textContent = "Couldn't load availability. Please refresh the page to try again.";
     }
   }
 
@@ -1843,7 +1860,7 @@
     const ci = document.getElementById('bpCheckin').value;
     const co = document.getElementById('bpCheckout').value;
     if (!ci || !co) { setBpSubmitEnabled(false); return; }
-    const sDate = new Date(ci), eDate = new Date(co);
+    const sDate = parseLocalDate(ci), eDate = parseLocalDate(co);
     const nights = Math.round((eDate - sDate) / 86400000);
     if (nights <= 0) { setBpSubmitEnabled(false); return; }
     const minN = getMinNights(sDate);
@@ -1897,20 +1914,21 @@
     const co = document.getElementById('bpCheckout').value;
     const guests = getGuestCounts().total;
     const hasDog = document.getElementById('bpHasDog').checked;
-    const nights = Math.round((new Date(co) - new Date(ci)) / 86400000);
+    const nights = Math.round((parseLocalDate(co) - parseLocalDate(ci)) / 86400000);
     let total = 0;
     for (let i = 0; i < nights; i++) {
-      const d = new Date(ci); d.setDate(d.getDate() + i);
+      const d = parseLocalDate(ci); d.setDate(d.getDate() + i);
       total += nightRate(d);
     }
     const isWeek = nights >= 7;
     const afterWeek = total - (isWeek ? Math.round(total * WEEK_DISCOUNT) : 0);
-    const discountAmt = appliedDiscountPercent > 0 ? Math.round(afterWeek * (appliedDiscountPercent / 100)) : 0;
+    // Rounded to the penny, exactly as create-booking works it out.
+    const discountAmt = appliedDiscountPercent > 0 ? Math.round(afterWeek * (appliedDiscountPercent / 100) * 100) / 100 : 0;
     // The pet surcharge is a flat fee on top — it isn't itself subject to the week or code discount.
     const dogSurcharge = (hasDog && DOG_SURCHARGE_ENABLED) ? DOG_SURCHARGE_AMOUNT : 0;
-    const finalTotal = Math.max(0, afterWeek - discountAmt) + dogSurcharge;
+    const finalTotal = Math.max(0, Math.round((afterWeek - discountAmt) * 100) / 100) + dogSurcharge;
     const today0 = new Date(); today0.setHours(0,0,0,0);
-    const daysUntil = Math.round((new Date(ci) - today0) / 86400000);
+    const daysUntil = Math.round((parseLocalDate(ci) - today0) / 86400000);
     const isFullPayment = daysUntil < FULL_PAYMENT_WINDOW_DAYS;
     const amountDue = finalTotal <= 0 ? 0 : (isFullPayment ? finalTotal : Math.round(finalTotal * DEPOSIT_RATE));
     return { ci, co, nights, guests, total, isWeek, afterWeek, discountAmt, dogSurcharge, finalTotal, isFullPayment, amountDue };
@@ -1920,12 +1938,12 @@
     const p = computeStep2Pricing();
     const depositPct = Math.round(DEPOSIT_RATE * 100);
     let html = `${p.ci} → ${p.co} · ${p.nights} night${p.nights!==1?'s':''} · ${p.guests} guest${p.guests!==1?'s':''}<br>`;
-    if (p.discountAmt > 0) html += `Discount code applied (${appliedDiscountCode}): −£${p.discountAmt}<br>`;
+    if (p.discountAmt > 0) html += `Discount code applied (${appliedDiscountCode}): −${fmtGBP(p.discountAmt)}<br>`;
     if (p.dogSurcharge > 0) html += `Pet surcharge: +£${p.dogSurcharge}<br>`;
     if (p.finalTotal <= 0) {
       html += `Total £0 · Fully covered by discount code — no payment needed`;
     } else {
-      html += `Total £${p.finalTotal} · ${p.isFullPayment ? `Full payment due (within ${FULL_PAYMENT_WINDOW_DAYS} days)` : `${depositPct}% deposit`}: <strong>£${p.amountDue}</strong>`;
+      html += `Total ${fmtGBP(p.finalTotal)} · ${p.isFullPayment ? `Full payment due (within ${FULL_PAYMENT_WINDOW_DAYS} days)` : `${depositPct}% deposit`}: <strong>${fmtGBP(p.amountDue)}</strong>`;
     }
     document.getElementById('bpDateSummaryBox').innerHTML = html;
     const bpPaymentNoteEl = document.getElementById('bpPaymentNote');
@@ -2301,7 +2319,7 @@
     const dots = document.getElementById('reviewDots');
     if (!dots) return;
     dots.innerHTML = REVIEWS.map((_, i) =>
-      `<button class="review-dot${i===0?' active':''}" onclick="goToReview(${i})"></button>`
+      `<button class="review-dot${i===0?' active':''}" aria-label="Review ${i+1}" onclick="goToReview(${i})"></button>`
     ).join('');
   }
 
@@ -2328,12 +2346,41 @@
   function prevReview() { if (REVIEWS.length) goToReview((currentReview - 1 + REVIEWS.length) % REVIEWS.length); }
 
   loadReviews();
-  setInterval(nextReview, 6000);
+  // Reviews move on every 6 seconds, except while someone is reading one
+  // (pointer or keyboard focus on it) or has asked their device for less motion.
+  let reviewsPaused = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  (() => {
+    const strip = document.getElementById('reviewStrip');
+    if (!strip || reviewsPaused) return;
+    const pause = () => { reviewsPaused = true; }, resume = () => { reviewsPaused = false; };
+    strip.addEventListener('mouseenter', pause);
+    strip.addEventListener('mouseleave', resume);
+    strip.addEventListener('focusin', pause);
+    strip.addEventListener('focusout', resume);
+  })();
+  setInterval(() => { if (!reviewsPaused) nextReview(); }, 6000);
+
+  // Gallery photos open with Enter or Space as well as a click.
+  document.querySelectorAll('.g-cell[role="button"]').forEach(cell => {
+    cell.addEventListener('keydown', e => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); cell.click(); }
+    });
+  });
 
   // ─── VIDEO: play once then fade to hero image ───────────────────
   (function() {
     const video = document.getElementById('heroVideo');
     if (!video) return;
+    // Only fetched when the visitor hasn't asked to save data and isn't on
+    // a slow connection; otherwise the poster photo stays as the hero.
+    const conn = navigator.connection || {};
+    const slow = conn.saveData || /(^|-)(2g|3g)$/.test(conn.effectiveType || '');
+    const lessMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (slow || lessMotion) return;
+    const source = video.querySelector('source[data-src]');
+    source.src = source.dataset.src;
+    video.load();
+    video.play().catch(() => { /* autoplay refused: the poster stays */ });
     video.addEventListener('ended', () => {
       // Hold on last frame for 2s, then fade to the hero poster and stay
       setTimeout(() => {
@@ -2370,13 +2417,32 @@
     navLinks.forEach(a => { a.style.color = a.getAttribute('href') === '#'+cur ? 'var(--sage-light)' : ''; });
   });
 
+  // Back from the Stripe page without paying: free the guest's dates now, so
+  // choosing them again doesn't say they're taken.
+  async function releaseCancelledPayment() {
+    const params = new URLSearchParams(window.location.search);
+    const bookingId = params.get('payment_cancelled');
+    if (!bookingId) return;
+    params.delete('payment_cancelled');
+    const qs = params.toString();
+    history.replaceState(null, '', window.location.pathname + (qs ? '?' + qs : '') + window.location.hash);
+    try {
+      await fetch(`${SUPABASE_URL}/functions/v1/release-hold`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ booking_id: bookingId }),
+      });
+    } catch (e) { /* the hold still runs out on its own */ }
+    showToast('Payment cancelled, so nothing has been booked. You can choose your dates again.');
+  }
+
   // ─── INIT ───────────────────────────────────────────────────────
   buildCal(); // render calendar immediately
   renderReviewDots();
   const _statusEl = document.getElementById('icalStatus');
   if (_statusEl) _statusEl.textContent = 'Loading availability…';
   (async () => {
-    try { await Promise.all([loadRatesFromSheet(), loadBookingSettings()]); } catch(e) {}
+    try { await Promise.all([loadRatesFromSheet(), loadBookingSettings(), releaseCancelledPayment()]); } catch(e) {}
     await syncCalendar();
   })();
 

@@ -136,7 +136,9 @@ Deno.serve(async (req: Request) => {
       "line_items[0][price_data][unit_amount]": String(Math.round(amountToCharge * 100)),
       "line_items[0][quantity]": "1",
       success_url: `${base}booking-confirmed.html?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: payPurpose === "balance" ? `${base}pay-balance.html` : `${base}#availability`,
+      // Backing out of a first payment frees the guest's dates straight away
+      // (index.html passes this id to release-hold), so they can try again.
+      cancel_url: payPurpose === "balance" ? `${base}pay-balance.html` : `${base}?payment_cancelled=${booking.id}#availability`,
       "metadata[booking_id]": booking.id,
       "metadata[purpose]": payPurpose,
     };
