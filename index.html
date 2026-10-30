@@ -13,8 +13,8 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Cringley Cottage">
-<meta name="description" content="Cringley Cottage is a charming 2-bedroom holiday cottage in Askrigg, heart of the Yorkshire Dales. Sleeps 4, log burning stove, private garden. Dog friendly. Book direct.">
-<meta name="keywords" content="holiday cottage Askrigg, Yorkshire Dales cottage, self catering Wensleydale, dog friendly cottage Yorkshire, Cringley Cottage, cottage Askrigg, holiday rental Yorkshire Dales">
+<meta name="description" content="Cringley Cottage is a charming 2-bedroom holiday cottage in Askrigg, heart of the Yorkshire Dales. Sleeps 4, log burning stove, enclosed garden, dogs stay free. In the village where the original All Creatures Great and Small was filmed. Book direct.">
+<meta name="keywords" content="holiday cottage Askrigg, Yorkshire Dales cottage, self catering Wensleydale, dog friendly cottage Yorkshire, Cringley Cottage, cottage Askrigg, holiday rental Yorkshire Dales, All Creatures Great and Small cottage, Herriot country cottage, Skeldale House Askrigg">
 <link rel="canonical" href="https://www.cringleycottage.com/">
 
 <!-- Open Graph (Facebook, WhatsApp previews) -->
@@ -229,6 +229,15 @@
     border-radius: 2px;
     border-left: 2px solid var(--sage);
   }
+  .hero-herriot {
+    display: block; max-width: 440px;
+    margin: -1.8rem 0 2.2rem; padding: 0.4rem 0.85rem;
+    background: rgba(20,17,13,0.6); border-radius: 2px;
+    font-size: 0.82rem; color: rgba(247,242,234,0.92);
+    animation: fadeUp 0.8s 0.55s both;
+    text-shadow: 0 1px 6px rgba(0,0,0,0.6);
+  }
+  .hero-herriot em { color: #c8d9b8; }
   .hero-actions {
     display: flex; gap: 1rem; flex-wrap: wrap;
     animation: fadeUp 0.8s 0.65s both;
@@ -395,6 +404,34 @@
   .feat-icon svg { width: 16px; height: 16px; stroke: var(--sage); fill: none; stroke-width: 1.5; }
   .feat-text strong { display: block; font-size: 0.85rem; font-weight: 500; margin-bottom: 0.15rem; }
   .feat-text span { font-size: 0.78rem; color: var(--muted); }
+  .dog-note {
+    margin-top: 2rem; padding: 1.1rem 1.3rem;
+    background: var(--cream); border-left: 2px solid var(--sage); border-radius: 2px;
+    font-size: 0.88rem; color: var(--muted); line-height: 1.7;
+  }
+  .dog-note strong { color: var(--ink); font-weight: 500; }
+  .dog-note a { color: var(--sage); }
+
+  /* BOOK DIRECT */
+  .direct-box {
+    margin-top: 2rem;
+    display: grid; grid-template-columns: minmax(220px, 0.8fr) 2fr; gap: 1.5rem 3rem;
+    background: var(--cream); border: 1px solid var(--stone); border-left: 3px solid var(--sage);
+    border-radius: 2px; padding: 1.6rem 1.8rem;
+  }
+  .direct-box h3 {
+    font-family: 'Cormorant Garamond', serif; font-size: 1.6rem; font-weight: 600;
+    color: var(--ink); line-height: 1.1; margin-bottom: 0.5rem;
+  }
+  .direct-box > div > p { font-size: 0.85rem; color: var(--muted); line-height: 1.6; }
+  .direct-list { list-style: none; display: grid; grid-template-columns: 1fr 1fr; gap: 0.8rem 2rem; }
+  .direct-list li { display: flex; gap: 0.6rem; font-size: 0.86rem; color: var(--ink); line-height: 1.5; }
+  .direct-list li::before { content: '\2713'; color: var(--sage); font-weight: 600; flex-shrink: 0; }
+  .direct-list li span { display: block; font-size: 0.78rem; color: var(--muted); }
+  @media (max-width: 860px) {
+    .direct-box { grid-template-columns: 1fr; padding: 1.3rem 1.2rem; }
+    .direct-list { grid-template-columns: 1fr; }
+  }
 
   /* GALLERY */
   #gallery {
@@ -884,7 +921,14 @@
     #about { grid-template-columns: 1fr; }
     .about-img-badge { right: 1rem; }
     .cal-wrap { grid-template-columns: 1fr; }
-    .hero-stats { display: none; }
+    .hero-stats {
+      left: 5%; right: 5%; bottom: 5rem;
+      display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.4rem;
+      text-align: left; animation: fadeUp 0.8s 0.7s both;
+    }
+    .stat-item { padding: 0.45rem 0.55rem; }
+    .stat-num { font-size: 1.25rem; }
+    .stat-label { font-size: 0.6rem; letter-spacing: 0.1em; }
     .gallery-grid { grid-template-columns: 1fr 1fr; grid-template-rows: auto; }
     .g-cell { grid-column: auto !important; grid-row: auto !important; aspect-ratio: 4/3; }
     nav { padding: 1rem 5%; }
@@ -912,6 +956,7 @@
     opacity: 0; transform: translateY(12px) scale(0.96); pointer-events: none;
     transition: opacity 0.25s ease, transform 0.25s ease, background 0.2s ease;
   }
+  .float-book .fb-price { font-size: 0.72em; opacity: 0.85; letter-spacing: 0.04em; text-transform: none; border-left: 1px solid rgba(247,242,234,0.35); padding-left: 0.5rem; }
   .float-book.visible { opacity: 1; transform: translateY(0) scale(1); pointer-events: auto; }
   .float-book:hover { background: var(--sage-light); }
   @media (max-width: 640px) {
@@ -921,7 +966,7 @@
 </head>
 <body>
 
-<a href="#availability" class="float-book" id="floatBookBtn">&#128197; Book Now</a>
+<a href="#availability" class="float-book" id="floatBookBtn">&#128197; Book Now<span class="fb-price" id="floatBookPrice" style="display:none"></span></a>
 
 <!-- NAV -->
 <nav>
@@ -947,19 +992,28 @@
     <span class="hero-tag">Askrigg · Yorkshire Dales</span>
     <h1 class="hero-title">Cringley<br><em>Cottage</em></h1>
     <p class="hero-sub">Two bedrooms, a log burning stove, and a garden — in the heart of the Yorkshire Dales.</p>
+    <p class="hero-herriot">In Herriot's Darrowby: a short stroll from the original Skeldale House from <em>All Creatures Great and Small</em>.</p>
     <div class="hero-actions">
       <a href="#availability" class="btn-primary">Check Availability</a>
       <a href="#about" class="btn-outline">Discover More</a>
     </div>
   </div>
   <div class="hero-stats">
+    <div class="stat-item" id="statFromPrice" style="display:none">
+      <div class="stat-num" id="statFromPriceNum"></div>
+      <div class="stat-label">From/night</div>
+    </div>
     <div class="stat-item">
       <div class="stat-num">4</div>
-      <div class="stat-label">Max Guests</div>
+      <div class="stat-label">Sleeps</div>
     </div>
     <div class="stat-item">
       <div class="stat-num">2</div>
       <div class="stat-label">Bedrooms</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-num">Dogs</div>
+      <div class="stat-label">Stay free</div>
     </div>
   </div>
 </section>
@@ -967,9 +1021,9 @@
 <!-- STRIP -->
 <div class="strip">
   <div class="strip-item"><span class="strip-dot"></span> Free WiFi</div>
-  <div class="strip-item"><span class="strip-dot"></span> Dog Friendly</div>
+  <div class="strip-item"><span class="strip-dot"></span> Dogs Stay Free</div>
   <div class="strip-item"><span class="strip-dot"></span> Log Burning Stove</div>
-  <div class="strip-item"><span class="strip-dot"></span> Private Garden</div>
+  <div class="strip-item"><span class="strip-dot"></span> Enclosed Garden</div>
   <div class="strip-item"><span class="strip-dot"></span> Walks from the Door</div>
 </div>
 
@@ -998,8 +1052,8 @@
           <svg viewBox="0 0 24 24"><path d="M8 14s1.5 2 4 2 4-2 4-2M9 9h.01M15 9h.01M20.3 15.7A9 9 0 113.7 8.3"/></svg>
         </div>
         <div class="feat-text">
-          <strong>Dog Friendly</strong>
-          <span>Well-behaved dogs welcome</span>
+          <strong>Dogs Stay Free</strong>
+          <span>No pet fee, ever</span>
         </div>
       </div>
       <div class="feat-item">
@@ -1025,8 +1079,8 @@
           <svg viewBox="0 0 24 24"><path d="M3 17l9-13 9 13H3zM12 4v1M4.6 15h14.8"/></svg>
         </div>
         <div class="feat-text">
-          <strong>Private Garden</strong>
-          <span>Outdoor seating area</span>
+          <strong>Enclosed Garden</strong>
+          <span>Private, with outdoor seating</span>
         </div>
       </div>
       <div class="feat-item">
@@ -1039,6 +1093,7 @@
         </div>
       </div>
     </div>
+    <p class="dog-note"><strong>Bringing your dog?</strong> Well-behaved dogs stay free. The private garden is fully enclosed and has its own gate at the side of the house, so it's a safe space for dogs to stretch their legs, and the fells and riverside paths start from the front door. Please see our <a href="terms.html">pet guidelines</a> before you arrive.</p>
   </div>
 </section>
 
@@ -1082,6 +1137,13 @@
   <h2 class="section-title">Walks from<br>the Door</h2>
   <p class="section-body">Askrigg sits at the heart of Wensleydale — step outside and you're immediately surrounded by some of England's finest walking country.</p>
   <div class="walks-grid">
+
+    <div class="walk-card featured-walk">
+      <div class="walk-distance">Around the corner</div>
+      <h3 class="walk-name">Herriot's Darrowby</h3>
+      <p class="walk-desc">Askrigg was Darrowby in the BBC's <em>All Creatures Great and Small</em> (1978–1990). Cringley House on the Market Place, a short stroll from the cottage, played Skeldale House, home of Siegfried Farnon and James Herriot, and the King's Arms was the Drovers Arms.</p>
+      <div class="walk-tags"><span>Easy</span><span>Village stroll</span><span>TV history</span></div>
+    </div>
 
     <div class="walk-card">
       <div class="walk-distance">0.5 mi</div>
@@ -1136,6 +1198,18 @@
     <span id="statusDot" style="width:8px;height:8px;border-radius:50%;background:var(--sage);display:inline-block;"></span>
     <span id="icalStatus">Calendar ready</span>
   </p>
+  <div class="direct-box">
+    <div>
+      <h3>Book direct and save</h3>
+      <p>It's the same cottage you'll find on Airbnb and Booking.com, but those sites take a cut of every booking. Book with us and that saving is yours.</p>
+    </div>
+    <ul class="direct-list">
+      <li><div>Our best price<span>You won't find Cringley Cottage cheaper elsewhere</span></div></li>
+      <li><div>No booking or service fees<span>The total you see is the total you pay</span></div></li>
+      <li><div>Dogs stay free<span>No pet fee, and a fully enclosed garden</span></div></li>
+      <li><div>Deal with the owners<span>Just 25% to secure your dates, and questions answered by us, not a call centre</span></div></li>
+    </ul>
+  </div>
   <div class="cal-wrap">
     <!-- Calendar -->
     <div>
@@ -1419,6 +1493,20 @@
     } catch(e) { /* use fallback */ }
   }
 
+  // "From £X" on the hero and the floating Book button: the cheapest
+  // nightly rate for any date from today on.
+  function showFromPrice() {
+    const todayISO = toLocalISODate(new Date());
+    const upcoming = RATES.filter(r => r.to >= todayISO).map(r => r.rate);
+    if (!upcoming.length) return;
+    const from = fmtGBP(Math.min(...upcoming));
+    const num = document.getElementById('statFromPriceNum');
+    const stat = document.getElementById('statFromPrice');
+    if (num && stat) { num.textContent = from; stat.style.display = ''; }
+    const fb = document.getElementById('floatBookPrice');
+    if (fb) { fb.textContent = `from ${from}/night`; fb.style.display = ''; }
+  }
+
   // A Date built from local y/m/d fields must round-trip back to the same
   // y/m/d — toISOString() converts to UTC first, which silently shifts the
   // date back a day for anyone browsing from a UTC+ timezone (the UK included,
@@ -1615,7 +1703,7 @@
     if (contactIntro) contactIntro.textContent = 'Get in touch with any questions about your stay — to book specific dates, use the availability checker above.';
 
     const bpDogLabel = document.getElementById('bpHasDogLabel');
-    if (bpDogLabel) bpDogLabel.textContent = (DOG_SURCHARGE_ENABLED && DOG_SURCHARGE_AMOUNT > 0) ? `Bringing a dog? (+£${DOG_SURCHARGE_AMOUNT})` : 'Bringing a dog?';
+    if (bpDogLabel) bpDogLabel.textContent = (DOG_SURCHARGE_ENABLED && DOG_SURCHARGE_AMOUNT > 0) ? `Bringing a dog? (+£${DOG_SURCHARGE_AMOUNT})` : 'Bringing a dog? (dogs stay free)';
   }
   function tooSoon(date) {
     const cutoff = new Date(today); cutoff.setDate(cutoff.getDate() + MIN_ADVANCE_NIGHTS);
@@ -2490,6 +2578,7 @@
   if (_statusEl) _statusEl.textContent = 'Loading availability…';
   (async () => {
     try { await Promise.all([loadRatesFromSheet(), loadBookingSettings(), releaseCancelledPayment()]); } catch(e) {}
+    showFromPrice();
     await syncCalendar();
   })();
 
