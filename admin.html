@@ -109,8 +109,20 @@
   .review-card .rc-text { font-size: 0.88rem; color: var(--ink); line-height: 1.5; }
   .review-card .rc-actions { display: flex; flex-direction: column; gap: 0.4rem; align-items: flex-end; white-space: nowrap; }
   .review-card button { background: none; border: none; cursor: pointer; font-size: 0.78rem; font-family: 'DM Sans', sans-serif; }
-  .review-card button.rc-toggle { color: var(--sage); }
-  .review-card button.rc-delete { color: #b4503c; }
+  .review-card button.rc-toggle, .review-card button.rc-unhold { color: var(--sage); }
+  .review-card button.rc-delete, .review-card button.rc-hold { color: #b4503c; }
+  .review-card .rc-status { display: inline-block; font-size: 0.68rem; letter-spacing: 0.05em; text-transform: uppercase; padding: 0.1rem 0.45rem; border-radius: 2px; margin-left: 0.3rem; }
+  .rc-status.live { background: rgba(94,122,82,0.12); color: #3d5233; }
+  .rc-status.pending { background: rgba(200,150,60,0.15); color: #7a5c1e; }
+  .rc-status.held { background: rgba(180,80,60,0.1); color: #7a3325; }
+  .review-card .rc-note { margin-top: 0.6rem; padding: 0.5rem 0.7rem; background: var(--cream, #f3ede3); border-left: 3px solid rgba(0,0,0,0.12); font-size: 0.82rem; white-space: pre-wrap; }
+  .review-card .rc-note b, .review-card .rc-held b { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); display: block; font-weight: 500; }
+  .review-card .rc-held { margin-top: 0.6rem; font-size: 0.82rem; color: #7a3325; }
+  .review-card .rc-hold-form { margin-top: 0.6rem; display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; }
+  .review-card .rc-hold-form select { border: 1px solid rgba(0,0,0,0.15); border-radius: 2px; padding: 0.4rem; font-family: 'DM Sans', sans-serif; font-size: 0.8rem; max-width: 100%; }
+  .review-filter { display: flex; gap: 0.4rem; flex-wrap: wrap; margin-bottom: 0.8rem; }
+  .review-filter button { background: none; border: 1px solid rgba(0,0,0,0.15); border-radius: 2px; padding: 0.35rem 0.7rem; font-size: 0.78rem; cursor: pointer; font-family: 'DM Sans', sans-serif; }
+  .review-filter button.on { background: var(--sage); color: var(--cream); border-color: var(--sage); }
   .fire-card summary {
     padding: 0.9rem 1.2rem; cursor: pointer; display: flex; justify-content: space-between; align-items: center;
     font-size: 0.88rem; list-style: none;
@@ -319,7 +331,7 @@
     </div>
 
     <h2>Guest Messages</h2>
-    <p class="sub">Automatic emails sent to direct-booking guests — check-in day access details, and a check-out-eve reminder. Times are UK local time. To see which emails have gone out and which are coming up, open <a href="guest-emails.html" style="color:var(--sage);">Guest Emails</a>.</p>
+    <p class="sub">Automatic emails sent to direct-booking guests — check-in day access details, a check-out-eve reminder, and a review request the day after they leave. Times are UK local time. To see which emails have gone out and which are coming up, open <a href="guest-emails.html" style="color:var(--sage);">Guest Emails</a>.</p>
     <div id="guestMsgMsg" style="display:none;"></div>
     <div style="background:#fff;border-radius:4px;padding:1.2rem 1.4rem;box-shadow:0 1px 4px rgba(0,0,0,0.08);margin-bottom:1.2rem;">
       <div style="display:flex;gap:1rem;align-items:end;flex-wrap:wrap;margin-bottom:0.9rem;">
@@ -334,7 +346,7 @@
       <button id="saveCheckinEmailBtn" style="background:var(--sage);color:var(--cream);border:none;padding:0.6rem 1.1rem;border-radius:2px;cursor:pointer;font-size:0.8rem;">Save</button>
       <p style="font-size:0.78rem;color:var(--muted);margin-top:0.5rem;">Sent automatically on the day of check-in, once per booking.</p>
     </div>
-    <div style="background:#fff;border-radius:4px;padding:1.2rem 1.4rem;box-shadow:0 1px 4px rgba(0,0,0,0.08);margin-bottom:2.5rem;">
+    <div style="background:#fff;border-radius:4px;padding:1.2rem 1.4rem;box-shadow:0 1px 4px rgba(0,0,0,0.08);margin-bottom:1.2rem;">
       <div style="display:flex;gap:1rem;align-items:end;flex-wrap:wrap;margin-bottom:0.9rem;">
         <h3 style="font-family:'Cormorant Garamond',serif;font-size:1.15rem;flex:1;min-width:200px;">Check-out reminder email</h3>
         <div>
@@ -346,6 +358,17 @@
       <textarea id="checkoutEmailText" rows="6" style="width:100%;border:1px solid rgba(0,0,0,0.15);border-radius:2px;padding:0.6rem 0.7rem;font-family:'DM Sans',sans-serif;font-size:0.85rem;margin-bottom:0.6rem;"></textarea>
       <button id="saveCheckoutEmailBtn" style="background:var(--sage);color:var(--cream);border:none;padding:0.6rem 1.1rem;border-radius:2px;cursor:pointer;font-size:0.8rem;">Save</button>
       <p style="font-size:0.78rem;color:var(--muted);margin-top:0.5rem;">Sent automatically the day before check-out, once per booking.</p>
+    </div>
+    <div style="background:#fff;border-radius:4px;padding:1.2rem 1.4rem;box-shadow:0 1px 4px rgba(0,0,0,0.08);margin-bottom:2.5rem;">
+      <div style="display:flex;gap:1rem;align-items:end;flex-wrap:wrap;margin-bottom:0.9rem;">
+        <h3 style="font-family:'Cormorant Garamond',serif;font-size:1.15rem;flex:1;min-width:200px;">Review request email</h3>
+        <div>
+          <label style="display:block;font-size:0.68rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted);margin-bottom:0.3rem;">Send at (UK time)</label>
+          <input type="time" id="reviewEmailTime" style="border:1px solid rgba(0,0,0,0.15);border-radius:2px;padding:0.55rem 0.6rem;font-family:'DM Sans',sans-serif;font-size:0.85rem;">
+        </div>
+      </div>
+      <button id="saveReviewEmailBtn" style="background:var(--sage);color:var(--cream);border:none;padding:0.6rem 1.1rem;border-radius:2px;cursor:pointer;font-size:0.8rem;">Save</button>
+      <p style="font-size:0.78rem;color:var(--muted);margin-top:0.5rem;">Sent automatically the day after check-out, once per booking, with a private link that works once for that stay (for 60 days). The wording is fixed so every guest is asked the same way, whatever their stay was like, as the reviews policy and consumer law require.</p>
     </div>
 
     <h2>Seasonal Rates</h2>
@@ -400,8 +423,14 @@
     </div>
     <button id="syncNowBtn" style="background:none;border:1px solid var(--sage);color:var(--sage);padding:0.6rem 1.1rem;border-radius:2px;cursor:pointer;font-size:0.82rem;margin-bottom:2.5rem;">Sync Now</button>
 
-    <h2 style="margin-top:2.5rem;">Guest Reviews</h2>
-    <p class="sub">Paste in a good review whenever you spot one on Airbnb, Booking.com, or elsewhere — it'll rotate on the homepage.</p>
+    <h2 style="margin-top:2.5rem;" id="reviews">Guest Reviews</h2>
+    <p class="sub">Direct guests review through the link in their review request email. Each new review waits 3 days so you can read it, then goes on the website by itself. You can only hold one back for a reason in the <a href="reviews-policy.html" style="color:var(--sage);">reviews policy</a>, not because it's critical, and the reason is kept. You can also paste in reviews from Airbnb, Booking.com or Google. "In carousel" picks which reviews rotate on the home page; every live direct review also appears in the full list there.</p>
+    <div class="review-filter" id="reviewFilter">
+      <button type="button" data-f="all" class="on">All</button>
+      <button type="button" data-f="direct">Direct guests</button>
+      <button type="button" data-f="pending">Waiting to go live</button>
+      <button type="button" data-f="held">Held back</button>
+    </div>
     <div id="reviewsMsg" style="display:none;"></div>
     <div id="reviewsList" style="margin-bottom:1.2rem;"></div>
     <div id="addReviewForm" style="background:#fff;border-radius:4px;padding:1.4rem;box-shadow:0 1px 4px rgba(0,0,0,0.08);margin-bottom:2.5rem;">
@@ -1207,12 +1236,13 @@
     }
 
     async function loadGuestMessages() {
-      const res = await authFetch('/rest/v1/site_settings?select=checkin_email_time,checkout_email_time,checkin_email_text,checkout_email_text&id=eq.1');
+      const res = await authFetch('/rest/v1/site_settings?select=checkin_email_time,checkout_email_time,review_email_time,checkin_email_text,checkout_email_text&id=eq.1');
       if (!res) return;
       const rows = await res.json();
       if (Array.isArray(rows) && rows[0]) {
         document.getElementById('checkinEmailTime').value = (rows[0].checkin_email_time || '08:00:00').slice(0, 5);
         document.getElementById('checkoutEmailTime').value = (rows[0].checkout_email_time || '10:00:00').slice(0, 5);
+        document.getElementById('reviewEmailTime').value = (rows[0].review_email_time || '10:00:00').slice(0, 5);
         document.getElementById('checkinEmailText').value = rows[0].checkin_email_text || '';
         document.getElementById('checkoutEmailText').value = rows[0].checkout_email_text || '';
       }
@@ -1240,6 +1270,16 @@
       if (res && res.ok) showGuestMsgMsg('Check-out email saved.', true); else showGuestMsgMsg('Save failed.', false);
     });
 
+    document.getElementById('saveReviewEmailBtn').addEventListener('click', async () => {
+      const time = document.getElementById('reviewEmailTime').value;
+      if (!time) { showGuestMsgMsg('Pick a send time.', false); return; }
+      const res = await authFetch('/rest/v1/site_settings?id=eq.1', {
+        method: 'PATCH',
+        body: JSON.stringify({ review_email_time: time }),
+      });
+      if (res && res.ok) showGuestMsgMsg('Review request time saved.', true); else showGuestMsgMsg('Save failed.', false);
+    });
+
     loadGuestMessages();
     const REVIEW_SOURCE_LABELS = { airbnb: 'Airbnb', booking_com: 'Booking.com', direct: 'Direct Guest', google: 'Google' };
 
@@ -1251,42 +1291,125 @@
       setTimeout(() => { el.style.display = 'none'; }, 5000);
     }
 
+    // Reasons the reviews policy allows for holding a review back. A review
+    // can't be held back just because it's critical.
+    const HOLD_REASONS = [
+      'Fake, or not about a real stay at the cottage',
+      'Abusive, discriminatory or unlawful',
+      'Names or identifies another guest or a member of our team',
+      'Duplicate of another review',
+      'About another business',
+    ];
+    let reviewRows = [];
+    let reviewNotes = {};
+    let reviewFilter = 'all';
+
+    function reviewState(r) {
+      if (r.status === 'held') return 'held';
+      if (r.status === 'pending' && r.publish_at && new Date(r.publish_at) > new Date()) return 'pending';
+      return 'live';
+    }
+    function niceDateTime(iso) {
+      return new Date(iso).toLocaleString('en-GB', { timeZone: 'Europe/London', weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+    }
+
     async function loadReviewsAdmin() {
-      const res = await authFetch('/rest/v1/reviews?select=*&order=created_at.desc');
-      const wrap = document.getElementById('reviewsList');
+      const [res, notesRes] = await Promise.all([
+        authFetch('/rest/v1/reviews?select=*,bookings(booking_ref,checkin,checkout)&order=created_at.desc'),
+        authFetch('/rest/v1/review_private_notes?select=review_id,note'),
+      ]);
       if (!res) return;
       const rows = await res.json();
-      if (!Array.isArray(rows) || rows.length === 0) {
-        wrap.innerHTML = '<p style="color:var(--muted)">No reviews added yet.</p>';
+      reviewRows = Array.isArray(rows) ? rows : [];
+      reviewNotes = {};
+      if (notesRes && notesRes.ok) {
+        const notes = await notesRes.json();
+        if (Array.isArray(notes)) notes.forEach(n => { reviewNotes[n.review_id] = n.note; });
+      }
+      renderReviewsAdmin();
+    }
+
+    function renderReviewsAdmin() {
+      const wrap = document.getElementById('reviewsList');
+      const rows = reviewRows.filter(r =>
+        reviewFilter === 'all' ? true :
+        reviewFilter === 'direct' ? r.source === 'direct' :
+        reviewState(r) === reviewFilter);
+      if (rows.length === 0) {
+        wrap.innerHTML = `<p style="color:var(--muted)">${reviewRows.length ? 'No reviews here.' : 'No reviews added yet.'}</p>`;
         return;
       }
-      wrap.innerHTML = rows.map(r => `
+      wrap.innerHTML = rows.map(r => {
+        const state = reviewState(r);
+        const fromLink = !!r.booking_id;
+        const statusLabel = state === 'held' ? 'Held back'
+          : state === 'pending' ? `Goes live ${niceDateTime(r.publish_at)}`
+          : 'Live';
+        const stay = r.bookings ? ` · ${escapeHtml(r.bookings.booking_ref || '')}` : '';
+        const note = reviewNotes[r.id];
+        return `
         <div class="review-card" data-id="${r.id}">
           <div class="rc-body">
-            <div class="rc-meta">${escapeHtml(r.guest_name) || 'Verified Guest'} · ${escapeHtml(REVIEW_SOURCE_LABELS[r.source] || r.source)} · ${r.rating}/${r.rating_max}${r.featured ? '' : ' · Hidden'}</div>
+            <div class="rc-meta">${escapeHtml(r.guest_name) || 'Verified Guest'} · ${escapeHtml(REVIEW_SOURCE_LABELS[r.source] || r.source)}${stay} · ${r.rating}/${r.rating_max}
+              <span class="rc-status ${state}">${statusLabel}</span>${r.featured ? '' : ' · Not in carousel'}</div>
             <div class="rc-text">${escapeHtml(r.review_text)}</div>
+            ${note ? `<div class="rc-note"><b>Private note to you (never published)</b>${escapeHtml(note)}</div>` : ''}
+            ${state === 'held' ? `<div class="rc-held"><b>Held back ${r.held_at ? niceDateTime(r.held_at) : ''}</b>${escapeHtml(r.held_reason)}</div>` : ''}
           </div>
           <div class="rc-actions">
-            <button class="rc-toggle">${r.featured ? 'Hide' : 'Show'}</button>
-            <button class="rc-delete">Delete</button>
+            <button class="rc-toggle">${r.featured ? 'Remove from carousel' : 'Add to carousel'}</button>
+            ${fromLink
+              ? (state === 'held' ? '<button class="rc-unhold">Publish</button>' : '<button class="rc-hold">Hold back…</button>')
+              : '<button class="rc-delete">Delete</button>'}
           </div>
-        </div>`).join('');
+        </div>`;
+      }).join('');
     }
+
+    document.getElementById('reviewFilter').addEventListener('click', (e) => {
+      const b = e.target.closest('button'); if (!b) return;
+      reviewFilter = b.dataset.f;
+      document.querySelectorAll('#reviewFilter button').forEach(x => x.classList.toggle('on', x === b));
+      renderReviewsAdmin();
+    });
 
     document.getElementById('reviewsList').addEventListener('click', async (e) => {
       const card = e.target.closest('.review-card');
       if (!card) return;
       const id = card.dataset.id;
+      const r = reviewRows.find(x => x.id === id);
+      if (!r) return;
 
       if (e.target.classList.contains('rc-toggle')) {
-        const currentlyFeatured = e.target.textContent.trim() === 'Hide';
-        const res = await authFetch(`/rest/v1/reviews?id=eq.${id}`, { method: 'PATCH', body: JSON.stringify({ featured: !currentlyFeatured }) });
+        const res = await authFetch(`/rest/v1/reviews?id=eq.${id}`, { method: 'PATCH', body: JSON.stringify({ featured: !r.featured }) });
         if (res && res.ok) { showReviewsMsg('Updated.', true); loadReviewsAdmin(); } else showReviewsMsg('Update failed.', false);
+      }
+      if (e.target.classList.contains('rc-hold')) {
+        if (card.querySelector('.rc-hold-form')) return;
+        const form = document.createElement('div');
+        form.className = 'rc-hold-form';
+        form.innerHTML = `<select><option value="">Why? (reviews policy reasons only)</option>${HOLD_REASONS.map(h => `<option>${escapeHtml(h)}</option>`).join('')}</select>
+          <button class="rc-hold-confirm" style="color:#b4503c;">Hold back</button><button class="rc-hold-cancel">Cancel</button>`;
+        card.querySelector('.rc-body').appendChild(form);
+      }
+      if (e.target.classList.contains('rc-hold-cancel')) {
+        card.querySelector('.rc-hold-form')?.remove();
+      }
+      if (e.target.classList.contains('rc-hold-confirm')) {
+        const reason = card.querySelector('.rc-hold-form select').value;
+        if (!reason) { showReviewsMsg('Pick the reason from the list.', false); return; }
+        const res = await authFetch(`/rest/v1/reviews?id=eq.${id}`, { method: 'PATCH', body: JSON.stringify({ status: 'held', held_reason: reason, held_at: new Date().toISOString() }) });
+        if (res && res.ok) { showReviewsMsg('Held back. The reason is saved with the review.', true); loadReviewsAdmin(); } else showReviewsMsg('Update failed.', false);
+      }
+      if (e.target.classList.contains('rc-unhold')) {
+        if (!confirm('Publish this review on the website now?')) return;
+        const res = await authFetch(`/rest/v1/reviews?id=eq.${id}`, { method: 'PATCH', body: JSON.stringify({ status: 'published', held_reason: null, held_at: null }) });
+        if (res && res.ok) { showReviewsMsg('Published.', true); loadReviewsAdmin(); } else showReviewsMsg('Update failed.', false);
       }
       if (e.target.classList.contains('rc-delete')) {
         if (!confirm('Delete this review?')) return;
         const res = await authFetch(`/rest/v1/reviews?id=eq.${id}`, { method: 'DELETE' });
-        if (res && res.ok) { card.remove(); showReviewsMsg('Deleted.', true); } else showReviewsMsg('Delete failed.', false);
+        if (res && res.ok) { showReviewsMsg('Deleted.', true); loadReviewsAdmin(); } else showReviewsMsg('Delete failed.', false);
       }
     });
 

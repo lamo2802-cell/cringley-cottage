@@ -198,13 +198,14 @@
       const tbody = document.getElementById('emailUpcomingBody');
       const today = ukDateStr();
       const [setRes, bRes] = await Promise.all([
-        authFetch('/rest/v1/site_settings?select=checkin_email_time,checkout_email_time&id=eq.1'),
-        authFetch(`/rest/v1/bookings?select=id,booking_ref,guest_first_name,guest_last_name,guest_email,checkin,checkout,total_amount,amount_paid,balance_due_date,balance_reminder_sent_at,checkin_email_sent_at,checkout_email_sent_at,unpaid_arrival_alert_sent_at&source=eq.direct&is_blocked=eq.false&status=eq.confirmed&guest_email=not.is.null&checkout=gte.${today}&order=checkin.asc`),
+        authFetch('/rest/v1/site_settings?select=checkin_email_time,checkout_email_time,review_email_time&id=eq.1'),
+        authFetch(`/rest/v1/bookings?select=id,booking_ref,guest_first_name,guest_last_name,guest_email,checkin,checkout,total_amount,amount_paid,balance_due_date,balance_reminder_sent_at,checkin_email_sent_at,checkout_email_sent_at,review_request_sent_at,unpaid_arrival_alert_sent_at&source=eq.direct&is_blocked=eq.false&status=eq.confirmed&guest_email=not.is.null&checkout=gte.${shiftDate(today, -1)}&order=checkin.asc`),
       ]);
       if (!setRes || !setRes.ok || !bRes || !bRes.ok) { tbody.innerHTML = '<tr><td colspan="4" style="color:var(--muted)">Could not load upcoming emails.</td></tr>'; return; }
       const settings = (await setRes.json())[0] || {};
       const checkinTime = (settings.checkin_email_time || '08:00:00').slice(0, 5);
       const checkoutTime = (settings.checkout_email_time || '10:00:00').slice(0, 5);
+      const reviewTime = (settings.review_email_time || '10:00:00').slice(0, 5);
       const bookings = await bRes.json();
 
       const items = [];
@@ -232,7 +233,11 @@
         }
         const eve = shiftDate(b.checkout, -1);
         if (!b.checkout_email_sent_at && eve >= today) {
-          items.push({ when: eve + ' ' + checkoutTime, b, name: 'Checking out tomorrow', note: 'Check-out reminders and a request for a review.' });
+          items.push({ when: eve + ' ' + checkoutTime, b, name: 'Checking out tomorrow', note: 'Check-out reminders.' });
+        }
+        const dayAfter = shiftDate(b.checkout, 1);
+        if (!b.review_request_sent_at && dayAfter >= today) {
+          items.push({ when: dayAfter + ' ' + reviewTime, b, name: 'Review request', note: 'Asks for an honest review, with a private link that works once for this stay.' });
         }
       }
       items.sort((a, z) => a.when.localeCompare(z.when));

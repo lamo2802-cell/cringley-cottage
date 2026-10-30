@@ -877,6 +877,15 @@
   .review-dot { width: 6px; height: 6px; border-radius: 50%; background: rgba(247,242,234,0.2); transition: background 0.3s; cursor: pointer; border: none; }
   .review-dot.active { background: var(--sage-light); }
   .review-text { transition: opacity 0.4s ease; }
+  .all-reviews-toggle { display: inline-block; margin: 0.9rem 1rem 0 0; font-size: 0.72rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--sage-light); background: none; border: none; text-decoration: underline; cursor: pointer; font-family: inherit; padding: 0; }
+  .all-reviews-toggle[hidden], .all-reviews[hidden] { display: none; }
+  .all-reviews { margin-top: 1rem; border-top: 1px solid rgba(247,242,234,0.12); padding-top: 1rem; max-height: 420px; overflow-y: auto; }
+  .all-reviews-summary { font-size: 0.8rem; color: rgba(247,242,234,0.6); margin-bottom: 0.8rem; }
+  .all-review { padding: 0.8rem 0; border-bottom: 1px solid rgba(247,242,234,0.08); }
+  .all-review:last-child { border-bottom: none; }
+  .all-review .ar-stars { color: var(--sage-light); font-size: 0.85rem; }
+  .all-review .ar-text { font-family: 'Cormorant Garamond', serif; font-style: italic; font-size: 1rem; color: rgba(247,242,234,0.85); line-height: 1.55; margin: 0.25rem 0; white-space: pre-wrap; }
+  .all-review .ar-meta { font-size: 0.7rem; color: rgba(247,242,234,0.4); letter-spacing: 0.1em; text-transform: uppercase; }
 
   /* FOOTER */
   footer {
@@ -1422,7 +1431,9 @@
       <p class="review-text" id="reviewText">Loading reviews…</p>
       <p class="review-author" id="reviewAuthor"></p>
       <div style="display:flex;gap:5px;margin-top:1rem;" id="reviewDots"></div>
+      <button type="button" class="all-reviews-toggle" id="allReviewsToggle" aria-expanded="false" aria-controls="allReviews" hidden></button>
       <a href="reviews-policy.html" style="display:inline-block;margin-top:0.9rem;font-size:0.72rem;letter-spacing:0.1em;text-transform:uppercase;color:rgba(247,242,234,0.45);text-decoration:underline;">Review Policy</a>
+      <div class="all-reviews" id="allReviews" hidden></div>
     </div>
   </div>
 </section>
@@ -2417,7 +2428,7 @@
   });
 
   // ─── REVIEWS CAROUSEL ────────────────────────────────────────────
-  const SOURCE_LABELS = { airbnb: 'Airbnb', booking_com: 'Booking.com', direct: 'Direct Guest', google: 'Google' };
+  const SOURCE_LABELS = { airbnb: 'Airbnb', booking_com: 'Booking.com', direct: 'Direct guest', google: 'Google' };
   let REVIEWS = [];
   let currentReview = 0;
 
@@ -2429,11 +2440,16 @@
   async function loadReviews() {
     const textEl = document.getElementById('reviewText');
     try {
-      const res = await fetch(`${SUPABASE_URL}/rest/v1/reviews?select=guest_name,source,rating,rating_max,review_text&order=created_at.desc`, {
+      // The site can read every live review: the carousel shows the ones the
+      // owners have picked, and "All direct guest reviews" lists every live
+      // review collected through our own review link, good or bad.
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/reviews?select=guest_name,source,rating,rating_max,review_text,review_date,featured,created_at&order=created_at.desc`, {
         headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` }
       });
-      const rows = await res.json();
-      if (Array.isArray(rows) && rows.length > 0) {
+      const all = await res.json();
+      const rows = Array.isArray(all) ? all.filter(r => r.featured) : [];
+      renderAllDirectReviews(Array.isArray(all) ? all.filter(r => r.source === 'direct') : []);
+      if (rows.length > 0) {
         REVIEWS = rows.map(r => ({
           text: `"${r.review_text}"`,
           author: `— ${r.guest_name || 'Verified Guest'} · ${SOURCE_LABELS[r.source] || r.source}`,
@@ -2443,11 +2459,38 @@
         goToReview(0, true);
       } else if (textEl) {
         textEl.textContent = '';
-        document.getElementById('reviewStrip').style.display = 'none';
+        if (!Array.isArray(all) || !all.some(r => r.source === 'direct')) document.getElementById('reviewStrip').style.display = 'none';
       }
     } catch (e) {
       if (textEl) document.getElementById('reviewStrip').style.display = 'none';
     }
+  }
+
+  function renderAllDirectReviews(direct) {
+    const toggle = document.getElementById('allReviewsToggle');
+    const panel = document.getElementById('allReviews');
+    if (!toggle || !panel || direct.length === 0) return;
+    const esc = s => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const avg = direct.reduce((t, r) => t + (r.rating / r.rating_max) * 5, 0) / direct.length;
+    const label = `All ${direct.length} direct guest review${direct.length === 1 ? '' : 's'}`;
+    toggle.textContent = label;
+    toggle.hidden = false;
+    panel.innerHTML =
+      `<p class="all-reviews-summary">${direct.length === 1 ? '1 review' : direct.length + ' reviews'} from guests who booked with us directly, averaging ${avg.toFixed(1)} out of 5. Every review is shown, newest first.</p>` +
+      direct.map(r => {
+        const when = r.review_date || (r.created_at || '').slice(0, 10);
+        const date = when ? new Date(when + 'T12:00:00Z').toLocaleDateString('en-GB', { month: 'long', year: 'numeric' }) : '';
+        return `<div class="all-review"><div class="ar-stars" aria-label="${r.rating} out of ${r.rating_max}">${starsFor(r.rating, r.rating_max)}</div>
+          <p class="ar-text">"${esc(r.review_text)}"</p>
+          <p class="ar-meta">${esc(r.guest_name || 'Verified guest')}${date ? ' · ' + esc(date) : ''}</p></div>`;
+      }).join('');
+    toggle.addEventListener('click', () => {
+      const open = panel.hidden;
+      panel.hidden = !open;
+      toggle.setAttribute('aria-expanded', String(open));
+      toggle.textContent = open ? 'Hide reviews' : label;
+      if (open) reviewsPaused = true;
+    });
   }
 
   function renderReviewDots() {
