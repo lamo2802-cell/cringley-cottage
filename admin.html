@@ -339,6 +339,31 @@
       <p style="font-size:0.78rem;color:var(--muted);margin-top:0.5rem;">Sent automatically the day before check-out, once per booking.</p>
     </div>
 
+    <h2 id="guest-emails">Guest Emails</h2>
+    <p class="sub">What the site has emailed guests, and what it will email them next. The site started keeping a record on 24 October 2026, so anything sent before then isn't listed.</p>
+    <h3 style="font-family:'Cormorant Garamond',serif;font-size:1.15rem;margin-bottom:0.6rem;">Coming up</h3>
+    <table id="emailUpcomingTable" style="margin-bottom:1.8rem;">
+      <colgroup><col style="width:22%"><col style="width:16%"><col style="width:24%"><col style="width:38%"></colgroup>
+      <thead><tr><th>Due to send</th><th>Booking</th><th>Email</th><th>Notes</th></tr></thead>
+      <tbody id="emailUpcomingBody"><tr><td colspan="4" style="color:var(--muted)">Loading…</td></tr></tbody>
+    </table>
+    <div style="display:flex;gap:1rem;align-items:end;flex-wrap:wrap;margin-bottom:0.6rem;">
+      <h3 style="font-family:'Cormorant Garamond',serif;font-size:1.15rem;flex:1;min-width:160px;">Sent</h3>
+      <label style="font-size:0.8rem;color:var(--muted);display:flex;gap:0.4rem;align-items:center;cursor:pointer;">
+        <input type="checkbox" id="emailHistoryShowOwner"> Include emails to us
+      </label>
+      <select id="emailHistoryRange" style="border:1px solid rgba(0,0,0,0.15);border-radius:2px;padding:0.45rem 0.5rem;font-family:'DM Sans',sans-serif;font-size:0.82rem;">
+        <option value="30">Last 30 days</option>
+        <option value="90" selected>Last 90 days</option>
+        <option value="0">Everything</option>
+      </select>
+    </div>
+    <table id="emailHistoryTable" style="margin-bottom:2.5rem;">
+      <colgroup><col style="width:20%"><col style="width:16%"><col style="width:24%"><col style="width:28%"><col style="width:12%"></colgroup>
+      <thead><tr><th>When</th><th>Booking</th><th>To</th><th>Subject</th><th>Status</th></tr></thead>
+      <tbody id="emailHistoryBody"><tr><td colspan="5" style="color:var(--muted)">Loading…</td></tr></tbody>
+    </table>
+
     <h2>Seasonal Rates</h2>
     <p class="sub">These prices drive the booking calendar and payment amounts live on the site — changes take effect immediately.</p>
     <div id="msg"></div>
@@ -1209,7 +1234,7 @@
         method: 'PATCH',
         body: JSON.stringify({ checkin_email_time: time, checkin_email_text: text }),
       });
-      if (res && res.ok) showGuestMsgMsg('Check-in email saved.', true); else showGuestMsgMsg('Save failed.', false);
+      if (res && res.ok) { showGuestMsgMsg('Check-in email saved.', true); loadUpcomingEmails(); } else showGuestMsgMsg('Save failed.', false);
     });
 
     document.getElementById('saveCheckoutEmailBtn').addEventListener('click', async () => {
@@ -1220,10 +1245,134 @@
         method: 'PATCH',
         body: JSON.stringify({ checkout_email_time: time, checkout_email_text: text }),
       });
-      if (res && res.ok) showGuestMsgMsg('Check-out email saved.', true); else showGuestMsgMsg('Save failed.', false);
+      if (res && res.ok) { showGuestMsgMsg('Check-out email saved.', true); loadUpcomingEmails(); } else showGuestMsgMsg('Save failed.', false);
     });
 
     loadGuestMessages();
+    // ─── Guest emails (sent + coming up) ──────────────────────────────
+    // "Sent" reads email_log, which every sending function writes to, plus
+    // marketing_sends for offers. "Coming up" is worked out here from the
+    // same rules the scheduled functions use (send-guest-messages every 15
+    // min, send-balance-reminders daily at 09:00 UTC), so if those rules
+    // change this needs to change with them.
+    const BALANCE_REMINDER_DAYS = 7;
+    function ukDateStr(d = new Date()) {
+      return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/London' }).format(d);
+    }
+    function shiftDate(dateStr, n) {
+      const d = new Date(dateStr + 'T12:00:00Z');
+      d.setUTCDate(d.getUTCDate() + n);
+      return d.toISOString().slice(0, 10);
+    }
+    function niceDate(dateStr) {
+      return new Date(dateStr + 'T12:00:00Z').toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+    }
+    function poundsStr(n) { return '£' + Number(n).toFixed(2).replace(/\.00$/, ''); }
+    function bookingCell(b) {
+      if (!b) return '—';
+      const name = [b.guest_first_name, b.guest_last_name].filter(Boolean).join(' ');
+      return `<strong style="white-space:nowrap">${escapeHtml(b.booking_ref || 'No ref yet')}</strong>${name ? '<br><span style="color:var(--muted)">' + escapeHtml(name) + '</span>' : ''}`;
+    }
+
+    async function loadUpcomingEmails() {
+      const tbody = document.getElementById('emailUpcomingBody');
+      const today = ukDateStr();
+      const [setRes, bRes] = await Promise.all([
+        authFetch('/rest/v1/site_settings?select=checkin_email_time,checkout_email_time&id=eq.1'),
+        authFetch(`/rest/v1/bookings?select=id,booking_ref,guest_first_name,guest_last_name,guest_email,checkin,checkout,total_amount,amount_paid,balance_due_date,balance_reminder_sent_at,checkin_email_sent_at,checkout_email_sent_at,unpaid_arrival_alert_sent_at&source=eq.direct&is_blocked=eq.false&status=eq.confirmed&guest_email=not.is.null&checkout=gte.${today}&order=checkin.asc`),
+      ]);
+      if (!setRes || !setRes.ok || !bRes || !bRes.ok) { tbody.innerHTML = '<tr><td colspan="4" style="color:var(--muted)">Could not load upcoming emails.</td></tr>'; return; }
+      const settings = (await setRes.json())[0] || {};
+      const checkinTime = (settings.checkin_email_time || '08:00:00').slice(0, 5);
+      const checkoutTime = (settings.checkout_email_time || '10:00:00').slice(0, 5);
+      const bookings = await bRes.json();
+
+      const items = [];
+      for (const b of bookings) {
+        const outstanding = Math.max(0, Math.round(((b.total_amount || 0) - (b.amount_paid || 0)) * 100) / 100);
+
+        if (!b.balance_reminder_sent_at && b.balance_due_date && outstanding > 0 && b.balance_due_date >= today) {
+          let run = shiftDate(b.balance_due_date, -BALANCE_REMINDER_DAYS);
+          if (run < today) run = today;
+          if (run === today && new Date().getUTCHours() >= 9) run = shiftDate(today, 1);
+          if (run <= b.balance_due_date) {
+            const time = new Date(run + 'T09:00:00Z').toLocaleTimeString('en-GB', { timeZone: 'Europe/London', hour: '2-digit', minute: '2-digit' });
+            items.push({ when: run + ' ' + time, b, name: 'Balance due soon',
+              note: `${poundsStr(outstanding)} still to pay by ${niceDate(b.balance_due_date)}. Not sent if they pay before then.` });
+          }
+        }
+        if (!b.checkin_email_sent_at && b.checkin >= today) {
+          let note = 'Key-safe code and arrival details.';
+          if (outstanding > 0) {
+            note = b.unpaid_arrival_alert_sent_at
+              ? `On hold: ${poundsStr(outstanding)} unpaid. We've asked the guest to pay, and this goes as soon as they do.`
+              : `${poundsStr(outstanding)} still unpaid. If it isn't paid by check-in day, the guest gets a "pay your balance" email instead, and you get an alert.`;
+          }
+          items.push({ when: b.checkin + ' ' + checkinTime, b, name: 'Check-in today', note });
+        }
+        const eve = shiftDate(b.checkout, -1);
+        if (!b.checkout_email_sent_at && eve >= today) {
+          items.push({ when: eve + ' ' + checkoutTime, b, name: 'Checking out tomorrow', note: 'Check-out reminders and a request for a review.' });
+        }
+      }
+      items.sort((a, z) => a.when.localeCompare(z.when));
+
+      if (items.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" style="color:var(--muted)">Nothing scheduled. Emails appear here once a direct booking is confirmed.</td></tr>';
+        return;
+      }
+      tbody.innerHTML = items.map(i => {
+        const [d, t] = i.when.split(' ');
+        return `<tr>
+          <td data-label="Due to send">${escapeHtml(niceDate(d))}<br><span style="color:var(--muted)">${escapeHtml(t)}</span></td>
+          <td data-label="Booking">${bookingCell(i.b)}</td>
+          <td data-label="Email">${escapeHtml(i.name)}<br><span style="color:var(--muted)">to ${escapeHtml(i.b.guest_email)}</span></td>
+          <td data-label="Notes">${escapeHtml(i.note)}</td>
+        </tr>`;
+      }).join('');
+    }
+
+    async function loadEmailHistory() {
+      const tbody = document.getElementById('emailHistoryBody');
+      const days = Number(document.getElementById('emailHistoryRange').value);
+      const showOwner = document.getElementById('emailHistoryShowOwner').checked;
+      const since = days ? `&created_at=gte.${new Date(Date.now() - days * 86400000).toISOString()}` : '';
+      const [logRes, offerRes] = await Promise.all([
+        authFetch(`/rest/v1/email_log?select=created_at,recipient,subject,ok,error,bookings(booking_ref,guest_first_name,guest_last_name,guest_email)&order=created_at.desc&limit=500${since}`),
+        authFetch(`/rest/v1/marketing_sends?select=subject,recipient_count,created_at&order=created_at.desc&limit=100${since}`),
+      ]);
+      if (!logRes || !logRes.ok) { tbody.innerHTML = '<tr><td colspan="5" style="color:var(--muted)">Could not load the email log.</td></tr>'; return; }
+      const logRows = await logRes.json();
+      const offers = offerRes && offerRes.ok ? await offerRes.json() : [];
+
+      // A row is a guest email when it went to the booking's own guest
+      // address; everything else (owner alerts, sync failures) went to us.
+      const rows = logRows
+        .map(r => ({ ...r, toGuest: !!(r.bookings && r.bookings.guest_email && (r.recipient || '').toLowerCase() === r.bookings.guest_email.toLowerCase()) }))
+        .filter(r => showOwner || r.toGuest)
+        .concat(offers.map(o => ({ created_at: o.created_at, recipient: `${o.recipient_count} mailing-list guest${o.recipient_count === 1 ? '' : 's'}`, subject: 'Offer: ' + o.subject, ok: true, toGuest: true })))
+        .sort((a, z) => z.created_at.localeCompare(a.created_at));
+
+      if (rows.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="5" style="color:var(--muted)">No ${showOwner ? '' : 'guest '}emails sent in this period.</td></tr>`;
+        return;
+      }
+      tbody.innerHTML = rows.map(r => `
+        <tr>
+          <td data-label="When">${escapeHtml(new Date(r.created_at).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' }))}</td>
+          <td data-label="Booking">${bookingCell(r.bookings)}</td>
+          <td data-label="To" style="word-break:break-word;">${escapeHtml(r.toGuest ? r.recipient : 'Us (' + r.recipient + ')')}</td>
+          <td data-label="Subject">${escapeHtml(r.subject)}</td>
+          <td data-label="Status">${r.ok
+            ? '<span style="color:var(--sage)">Sent</span>'
+            : `<span style="color:#b4503c" title="${escapeHtml(r.error)}">Failed</span><br><span style="color:var(--muted);font-size:0.75rem;">${escapeHtml((r.error || '').slice(0, 80))}</span>`}</td>
+        </tr>`).join('');
+    }
+
+    function loadGuestEmails() { loadUpcomingEmails(); loadEmailHistory(); }
+    document.getElementById('emailHistoryRange').addEventListener('change', loadEmailHistory);
+    document.getElementById('emailHistoryShowOwner').addEventListener('change', loadEmailHistory);
+    loadGuestEmails();
     const REVIEW_SOURCE_LABELS = { airbnb: 'Airbnb', booking_com: 'Booking.com', direct: 'Direct Guest', google: 'Google' };
 
     function showReviewsMsg(text, ok) {
