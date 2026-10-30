@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<meta name="referrer" content="no-referrer">
+<title>Review your stay — Cringley Cottage</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --ink: #232120; --cream: #f3ede3; --stone: #dfd8cb;
+    --sage: #5e7a52; --sage-light: #84a472; --muted: #7a6f60; --white: #fff;
+  }
+  body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(--ink); line-height: 1.7; }
+  nav { background: var(--ink); padding: 1.2rem 6%; display: flex; align-items: center; justify-content: space-between; }
+  .nav-logo {
+    font-family: 'Cormorant Garamond', serif; font-size: 1.3rem; font-weight: 600;
+    color: #fff; letter-spacing: 0.14em; text-transform: uppercase;
+    text-decoration: none; border: 1px solid rgba(255,255,255,0.25);
+    padding: 0.35rem 0.9rem; border-radius: 2px;
+  }
+  .wrap { max-width: 620px; margin: 0 auto; padding: 3rem 6% 5rem; }
+  .label { font-size: 0.72rem; letter-spacing: 0.22em; text-transform: uppercase; color: var(--sage); font-weight: 500; margin-bottom: 0.6rem; }
+  h1 { font-family: 'Cormorant Garamond', serif; font-size: clamp(2rem, 5vw, 2.8rem); font-weight: 600; line-height: 1.1; margin-bottom: 0.6rem; }
+  .sub { color: var(--muted); font-weight: 300; margin-bottom: 2rem; }
+  .card { background: var(--white); border-radius: 4px; box-shadow: 0 1px 4px rgba(0,0,0,0.07); padding: 1.6rem; margin-bottom: 1.4rem; }
+  .field { margin-bottom: 1.4rem; }
+  .field:last-child { margin-bottom: 0; }
+  .field > label, .field > .flabel { display: block; font-weight: 500; font-size: 0.92rem; margin-bottom: 0.25rem; }
+  .hint { font-size: 0.8rem; color: var(--muted); font-weight: 300; margin-bottom: 0.5rem; }
+  textarea, input[type=text] {
+    width: 100%; font: inherit; font-size: 0.95rem; color: var(--ink);
+    border: 1px solid var(--stone); border-radius: 2px; padding: 0.7rem 0.8rem; background: #fdfbf7;
+  }
+  textarea { min-height: 150px; resize: vertical; }
+  textarea:focus, input:focus { outline: 2px solid var(--sage-light); outline-offset: 0; border-color: var(--sage-light); }
+  .count { font-size: 0.75rem; color: var(--muted); text-align: right; margin-top: 0.2rem; }
+  .stars { display: flex; gap: 0.25rem; }
+  .stars button {
+    background: none; border: none; cursor: pointer; font-size: 2.1rem; line-height: 1;
+    color: var(--stone); padding: 0.1rem; transition: color 0.15s;
+  }
+  .stars button.on { color: var(--sage); }
+  .stars button:focus-visible { outline: 2px solid var(--sage-light); border-radius: 2px; }
+  .tick { display: flex; gap: 0.6rem; align-items: flex-start; font-size: 0.9rem; margin-bottom: 0.6rem; cursor: pointer; }
+  .tick input { margin-top: 0.35rem; accent-color: var(--sage); width: 16px; height: 16px; flex-shrink: 0; }
+  .private { border-left: 3px solid var(--stone); padding-left: 1rem; }
+  .btn {
+    display: inline-block; background: var(--sage); color: var(--cream); border: none;
+    padding: 0.85rem 1.6rem; font: inherit; font-size: 0.8rem; letter-spacing: 0.08em; text-transform: uppercase;
+    border-radius: 2px; cursor: pointer;
+  }
+  .btn:hover { background: var(--sage-light); }
+  .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .btn.secondary { background: none; color: var(--ink); border: 1px solid var(--stone); }
+  .btn.secondary:hover { background: var(--white); }
+  .actions { display: flex; gap: 0.8rem; flex-wrap: wrap; align-items: center; }
+  .msg { font-size: 0.9rem; padding: 0.9rem 1rem; border-radius: 2px; margin-bottom: 1.2rem; }
+  .msg.err { background: rgba(180,80,60,0.1); border: 1px solid rgba(180,80,60,0.3); color: #7d3424; }
+  .msg.warn { background: #fbf4e3; border: 1px solid #e6d4a8; }
+  .preview-stars { color: var(--sage); font-size: 1.2rem; letter-spacing: 0.1em; }
+  .preview-text { font-family: 'Cormorant Garamond', serif; font-size: 1.25rem; font-style: italic; line-height: 1.5; margin: 0.6rem 0; white-space: pre-wrap; }
+  .preview-name { font-size: 0.75rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+  .preview-note { white-space: pre-wrap; font-size: 0.92rem; }
+  .small { font-size: 0.8rem; color: var(--muted); }
+  .small a { color: var(--sage); }
+  [hidden] { display: none !important; }
+  footer { text-align: center; padding: 2rem 6%; font-size: 0.75rem; color: var(--muted); }
+  footer a { color: var(--sage); }
+</style>
+</head>
+<body>
+<nav><a class="nav-logo" href="index.html">Cringley Cottage</a></nav>
+
+<div class="wrap">
+  <p class="label">Your stay</p>
+
+  <!-- Loading / link problems -->
+  <section id="loading"><h1>Just a moment…</h1></section>
+  <section id="bad" hidden>
+    <h1>We can't open this review</h1>
+    <div class="msg err" id="badMsg" role="alert"></div>
+    <p class="small"><a href="index.html">Back to cringleycottage.com</a></p>
+  </section>
+
+  <!-- 1. The form -->
+  <section id="formStep" hidden>
+    <h1 id="hello">How was your stay?</h1>
+    <p class="sub" id="stayLine"></p>
+    <div class="msg err" id="formErr" role="alert" hidden></div>
+
+    <div class="card">
+      <div class="field">
+        <span class="flabel" id="ratingLabel">Your rating</span>
+        <div class="stars" id="stars" role="radiogroup" aria-labelledby="ratingLabel"></div>
+      </div>
+      <div class="field">
+        <label for="reviewText">Your review</label>
+        <p class="hint">This will be shown on our website. Please tell us how it really was, good or bad.</p>
+        <textarea id="reviewText" maxlength="2000"></textarea>
+        <div class="count"><span id="reviewCount">0</span> / 2,000 (at least 20)</div>
+      </div>
+      <div class="field">
+        <label for="displayName">Name to show with your review</label>
+        <p class="hint">For example your first name and the first letter of your surname.</p>
+        <input type="text" id="displayName" maxlength="40" autocomplete="off">
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="field private">
+        <label for="privateNote">A private note to Mark and Ruth <span class="small">(optional)</span></label>
+        <p class="hint">Only we see this. It's never published. Anything we could do better, or anything you'd like us to know.</p>
+        <textarea id="privateNote" maxlength="2000" style="min-height:100px;"></textarea>
+      </div>
+    </div>
+
+    <div class="card">
+      <label class="tick"><input type="checkbox" id="confirmGenuine"> <span>This review is my own honest account of my stay.</span></label>
+      <label class="tick"><input type="checkbox" id="confirmAdult"> <span>I'm 18 or over.</span></label>
+      <p class="small" style="margin-top:0.6rem;">How we handle reviews: <a href="reviews-policy.html" target="_blank" rel="noopener">reviews policy</a> · <a href="privacy.html" target="_blank" rel="noopener">privacy</a></p>
+    </div>
+
+    <div class="actions"><button class="btn" id="toPreview" type="button">Check my review</button></div>
+  </section>
+
+  <!-- 2. Check before sending -->
+  <section id="previewStep" hidden>
+    <h1>Check your review</h1>
+    <div class="msg warn"><strong>Once you send it, you can't change it.</strong> Please check it reads the way you want.</div>
+    <div class="msg err" id="sendErr" role="alert" hidden></div>
+    <div class="card">
+      <p class="label">On our website</p>
+      <div class="preview-stars" id="pvStars"></div>
+      <p class="preview-text" id="pvText"></p>
+      <p class="preview-name" id="pvName"></p>
+    </div>
+    <div class="card" id="pvNoteCard">
+      <p class="label">Private note, just to us</p>
+      <p class="preview-note" id="pvNote"></p>
+    </div>
+    <div class="actions">
+      <button class="btn" id="sendBtn" type="button">Send my review</button>
+      <button class="btn secondary" id="backBtn" type="button">Go back and edit</button>
+    </div>
+  </section>
+
+  <!-- 3. Sent, or already sent -->
+  <section id="doneStep" hidden>
+    <h1 id="doneTitle">Thank you</h1>
+    <p class="sub" id="doneLine">Your review has reached us. It will appear on our website in a few days.</p>
+    <div class="card">
+      <div class="preview-stars" id="dStars"></div>
+      <p class="preview-text" id="dText"></p>
+      <p class="preview-name" id="dName"></p>
+    </div>
+    <p class="small">Reviews can't be changed once sent. If something's wrong, just reply to our email. · <a href="index.html">Back to cringleycottage.com</a></p>
+  </section>
+</div>
+
+<footer>&copy; Cringley Cottage &middot; Stars And Stiles Limited &middot; <a href="reviews-policy.html">Reviews policy</a></footer>
+
+<script>
+  const SUPABASE_URL = 'https://yfeyswuxhgezkpcjhznp.supabase.co';
+  const token = new URLSearchParams(window.location.search).get('t') || '';
+  const $ = id => document.getElementById(id);
+  let rating = 0;
+
+  function show(id) {
+    ['loading', 'bad', 'formStep', 'previewStep', 'doneStep'].forEach(s => { $(s).hidden = s !== id; });
+    window.scrollTo(0, 0);
+  }
+  function niceDate(d) {
+    return new Date(d + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+  }
+  function starString(n) { return '★'.repeat(n) + '☆'.repeat(5 - n); }
+  function fail(msg) { $('badMsg').textContent = msg; show('bad'); }
+
+  async function call(payload) {
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/guest-review`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token, ...payload }),
+    });
+    return res.json();
+  }
+
+  function showDone(review, justSent) {
+    $('doneTitle').textContent = justSent ? 'Thank you' : 'Already sent';
+    $('doneLine').textContent = justSent
+      ? "Your review has reached us. It will appear on our website in a few days. Thank you for taking the time."
+      : "You've already sent a review for this stay. Here's what you wrote.";
+    $('dStars').textContent = starString(review.rating);
+    $('dText').textContent = `"${review.review_text}"`;
+    $('dName').textContent = review.guest_name || '';
+    show('doneStep');
+  }
+
+  // Stars
+  function renderStars() {
+    $('stars').innerHTML = [1, 2, 3, 4, 5].map(n =>
+      `<button type="button" role="radio" aria-checked="${n === rating}" aria-label="${n} star${n > 1 ? 's' : ''}" data-n="${n}" class="${n <= rating ? 'on' : ''}">★</button>`
+    ).join('');
+  }
+  $('stars').addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return;
+    rating = Number(b.dataset.n); renderStars();
+  });
+  $('reviewText').addEventListener('input', () => { $('reviewCount').textContent = $('reviewText').value.length; });
+
+  function formValues() {
+    return {
+      rating,
+      review_text: $('reviewText').value.trim(),
+      display_name: $('displayName').value.trim().replace(/\s+/g, ' '),
+      private_note: $('privateNote').value.trim(),
+      confirm_genuine: $('confirmGenuine').checked,
+      confirm_adult: $('confirmAdult').checked,
+    };
+  }
+  function problem(v) {
+    if (!v.rating) return 'Please choose a star rating.';
+    if (v.review_text.length < 20) return 'Please write at least 20 characters in your review.';
+    if (!v.display_name) return 'Please enter the name to show with your review.';
+    if (!v.confirm_genuine || !v.confirm_adult) return 'Please tick both boxes to confirm.';
+    return '';
+  }
+
+  $('toPreview').addEventListener('click', () => {
+    const v = formValues();
+    const p = problem(v);
+    if (p) { $('formErr').textContent = p; $('formErr').hidden = false; $('formErr').scrollIntoView({ block: 'center' }); return; }
+    $('formErr').hidden = true;
+    $('pvStars').textContent = starString(v.rating);
+    $('pvText').textContent = `"${v.review_text}"`;
+    $('pvName').textContent = v.display_name;
+    $('pvNoteCard').hidden = !v.private_note;
+    $('pvNote').textContent = v.private_note;
+    $('sendErr').hidden = true;
+    show('previewStep');
+  });
+  $('backBtn').addEventListener('click', () => show('formStep'));
+
+  $('sendBtn').addEventListener('click', async () => {
+    const btn = $('sendBtn');
+    btn.disabled = true; btn.textContent = 'Sending…'; $('backBtn').disabled = true;
+    try {
+      const data = await call({ action: 'submit', ...formValues() });
+      if (data.ok || data.submitted) { showDone(data.review, !!data.ok); return; }
+      $('sendErr').textContent = data.error || 'Something went wrong. Please try again.';
+      $('sendErr').hidden = false;
+    } catch (e) {
+      $('sendErr').textContent = 'Something went wrong. Please check your connection and try again.';
+      $('sendErr').hidden = false;
+    }
+    btn.disabled = false; btn.textContent = 'Send my review'; $('backBtn').disabled = false;
+  });
+
+  (async () => {
+    if (!token) return fail("This link is missing its code. Please use the link in the email we sent you.");
+    try {
+      const data = await call({ action: 'get' });
+      if (!data.ok) return fail(data.error || "This review link isn't valid.");
+      if (data.submitted) return showDone(data.review, false);
+      const s = data.stay;
+      $('hello').textContent = s.first_name ? `How was your stay, ${s.first_name}?` : 'How was your stay?';
+      $('stayLine').textContent = `Cringley Cottage, ${niceDate(s.checkin)} to ${niceDate(s.checkout)}`;
+      $('displayName').value = [s.first_name, s.last_initial ? s.last_initial + '.' : ''].filter(Boolean).join(' ');
+      renderStars();
+      show('formStep');
+    } catch (e) {
+      fail('Something went wrong loading this page. Please try again in a minute.');
+    }
+  })();
+</script>
+</body>
+</html>

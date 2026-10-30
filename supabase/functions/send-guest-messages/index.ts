@@ -5,8 +5,11 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
 // owner's editable access instructions — key safe code etc.) at the
 // admin-configured UK time, and a check-out-eve reminder email (turn off
 // lights/radiators, secure windows, return key) at another admin-configured
-// UK time, the day before checkout. Each is sent exactly once per booking
-// (checkin_email_sent_at / checkout_email_sent_at guard against repeats).
+// UK time, the day before checkout. The day after checkout, at a third
+// admin-configured time, it sends a review request with a private link that
+// works once for that booking (see guest-review and review.html). Each is
+// sent exactly once per booking (checkin_email_sent_at /
+// checkout_email_sent_at / review_request_sent_at guard against repeats).
 // Only ever emails direct bookings with a guest email on file — Airbnb and
 // Booking.com bookings arrive via iCal with no guest contact info, so they
 // are naturally excluded.
@@ -18,6 +21,7 @@ const SYNC_SECRET = Deno.env.get("SYNC_SECRET");
 const FROM_EMAIL = "Cringley Cottage <hello@cringleycottage.com>";
 const SITE_BASE_URL = "https://www.cringleycottage.com/";
 const OWNER_EMAILS = ["lamo2802@gmail.com", "rpeacey987@gmail.com"];
+const REVIEW_LINK_DAYS = 60;
 
 function money(n: number): string { return "£" + Number(n).toFixed(2).replace(/\.00$/, ""); }
 function fmtDate(d: string): string {
@@ -141,19 +145,21 @@ Deno.serve(async (req: Request) => {
     const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
     const { date: todayUK, time: nowUK } = ukNow();
     const tomorrowUK = addDays(todayUK, 1);
+    const yesterdayUK = addDays(todayUK, -1);
 
     const { data: settings } = await supabase
       .from("site_settings")
-      .select("checkin_email_time, checkout_email_time, checkin_email_text, checkout_email_text")
+      .select("checkin_email_time, checkout_email_time, review_email_time, checkin_email_text, checkout_email_text")
       .eq("id", 1)
       .maybeSingle();
 
     const checkinTime = (settings?.checkin_email_time || "08:00:00").slice(0, 5);
     const checkoutTime = (settings?.checkout_email_time || "10:00:00").slice(0, 5);
+    const reviewTime = (settings?.review_email_time || "10:00:00").slice(0, 5);
     const checkinText = settings?.checkin_email_text || "";
     const checkoutText = settings?.checkout_email_text || "";
 
-    let checkinSent = 0, checkoutSent = 0, unpaidHeld = 0;
+    let checkinSent = 0, checkoutSent = 0, reviewSent = 0, unpaidHeld = 0;
 
     if (nowUK >= checkinTime) {
       const { data: arriving } = await supabase
@@ -244,7 +250,6 @@ Deno.serve(async (req: Request) => {
             infoRow("Check-out", `${fmtDate(b.checkout)}, by 10am`)
           ) +
           freeTextToHtml(checkoutText) +
-          para("If you've enjoyed your stay, we'd be so grateful for a few words about it. Just reply to this email, and with your OK we may share it on our website. It really helps a small cottage like ours.") +
           button("View guest information", `${SITE_BASE_URL}guest-info.html`)
         );
         await sendEmail(b.guest_email, `Checking Out Tomorrow — Cringley Cottage`, html, b.id);
@@ -253,7 +258,46 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    return new Response(JSON.stringify({ ok: true, checkinSent, checkoutSent, unpaidHeld, todayUK, nowUK }), { headers: { "Content-Type": "application/json" } });
+    if (nowUK >= reviewTime) {
+      const { data: leftYesterday } = await supabase
+        .from("bookings")
+        .select("id, booking_ref, guest_first_name, guest_email, checkin, checkout")
+        .eq("source", "direct").eq("is_blocked", false).eq("status", "confirmed")
+        .eq("checkout", yesterdayUK).is("review_request_sent_at", null)
+        .not("guest_email", "is", null);
+
+      for (const b of leftYesterday || []) {
+        // A random code for the link; only its hash is kept. Re-running for
+        // the same booking replaces an unused code rather than adding one.
+        const bytes = crypto.getRandomValues(new Uint8Array(32));
+        const token = btoa(String.fromCharCode(...bytes)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+        const tokenHash = Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(token))))
+          .map(x => x.toString(16).padStart(2, "0")).join("");
+        const expiresAt = new Date(b.checkout + "T23:59:59Z");
+        expiresAt.setUTCDate(expiresAt.getUTCDate() + REVIEW_LINK_DAYS);
+        const { error: inviteError } = await supabase.from("review_invites").upsert(
+          { booking_id: b.id, token_hash: tokenHash, expires_at: expiresAt.toISOString(), used_at: null },
+          { onConflict: "booking_id" },
+        );
+        if (inviteError) continue;
+
+        // Asks every guest the same way, whatever their stay was like, and
+        // offers nothing in return (reviews policy / DMCC Act 2024).
+        const html = emailShell(
+          heading("Thank you for staying with us") +
+          para(`Dear ${escapeHtml(b.guest_first_name) || "there"},`) +
+          para("We hope you had a great stay at Cringley Cottage and got home safely.") +
+          para("Would you leave us a short review? We'd like to hear how it really was, good or bad. It only takes a couple of minutes, and there's also space for a private note just to us if there's anything we could do better.") +
+          button("Leave a review", `${SITE_BASE_URL}review.html?t=${token}`) +
+          para(`<span style="font-size:13px;color:#7a6f60;">This link is just for your stay (${escapeHtml(b.booking_ref) || "your booking"}, ${fmtDate(b.checkin)} to ${fmtDate(b.checkout)}) and works until ${expiresAt.toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })}. We'll only ask once.</span>`)
+        );
+        await sendEmail(b.guest_email, `How was your stay? — Cringley Cottage`, html, b.id);
+        await supabase.from("bookings").update({ review_request_sent_at: new Date().toISOString() }).eq("id", b.id);
+        reviewSent++;
+      }
+    }
+
+    return new Response(JSON.stringify({ ok: true, checkinSent, checkoutSent, reviewSent, unpaidHeld, todayUK, nowUK }), { headers: { "Content-Type": "application/json" } });
   } catch (e) {
     return new Response(JSON.stringify({ ok: false, error: String(e) }), { status: 500, headers: { "Content-Type": "application/json" } });
   }
