@@ -652,8 +652,8 @@
   .cal-day.restart-checkin:hover { border-color: var(--sage-light); color: var(--sage); }
   .cal-day.empty { cursor: default; border: none; }
   .cal-day.booked {
-    background: repeating-linear-gradient(45deg, transparent, transparent 4px, rgba(122,112,96,0.08) 4px, rgba(122,112,96,0.08) 8px);
-    color: rgba(122,112,96,0.3);
+    background: rgba(122,112,96,0.15);
+    color: rgba(122,112,96,0.35);
     cursor: not-allowed;
     text-decoration: line-through;
   }
@@ -667,6 +667,14 @@
     cursor: not-allowed;
     background: repeating-linear-gradient(45deg, transparent, transparent 5px, rgba(122,112,96,0.05) 5px, rgba(122,112,96,0.05) 10px);
   }
+  /* Changeover days: the half taken by another stay is shaded, like the
+     split days on Airbnb. turn-in = another guest arrives that afternoon
+     (checkout only); turn-out = another guest leaves that morning. */
+  .cal-day.available.turn-in  { background: linear-gradient(135deg, var(--white) 50%, rgba(122,112,96,0.15) 50%); }
+  .cal-day.available.turn-out { background: linear-gradient(135deg, rgba(122,112,96,0.15) 50%, var(--white) 50%); }
+  .cal-day.available.turn-in:hover, .cal-day.available.turn-out:hover { background: var(--sage); }
+  /* Nights between the chosen check-in and the earliest allowed checkout */
+  .cal-day.min-stay { background: rgba(94,122,82,0.22); color: var(--ink); cursor: not-allowed; }
   .cal-day.checkin { background: var(--sage); color: var(--ink); font-weight: 500; }
   .cal-day.checkout { background: var(--sage); color: var(--ink); font-weight: 500; }
   .cal-day.in-range { background: rgba(94,122,82,0.15); }
@@ -1159,7 +1167,9 @@
           <div class="legend-item"><div class="legend-dot" style="background:var(--white);border:1px solid var(--stone)"></div> Available</div>
           <div class="legend-item"><div class="legend-dot" style="background:var(--sage)"></div> Selected</div>
           <div class="legend-item"><div class="legend-dot" style="background:rgba(122,112,96,0.15)"></div> Unavailable</div>
-          <div class="legend-item" id="legendBelowMin" style="display:none"><div class="legend-dot" style="background:repeating-linear-gradient(45deg, transparent, transparent 3px, rgba(122,112,96,0.15) 3px, rgba(122,112,96,0.15) 6px)"></div> Below minimum stay</div>
+          <div class="legend-item" id="legendBelowMin" style="display:none"><div class="legend-dot" style="background:repeating-linear-gradient(45deg, transparent, transparent 3px, rgba(122,112,96,0.15) 3px, rgba(122,112,96,0.15) 6px)"></div> <span id="legendBelowMinText">Gap too short to book</span></div>
+          <div class="legend-item" id="legendTurnover" style="display:none"><div class="legend-dot" style="background:linear-gradient(135deg, var(--white) 50%, rgba(122,112,96,0.3) 50%);border:1px solid var(--stone)"></div> Changeover day (half taken)</div>
+          <div class="legend-item" id="legendMinStay" style="display:none"><div class="legend-dot" style="background:rgba(94,122,82,0.22)"></div> Within minimum stay</div>
           <div class="legend-item" id="legendNoPrice" style="display:none"><div class="legend-dot" style="background:repeating-linear-gradient(45deg, transparent, transparent 3px, rgba(180,150,60,0.2) 3px, rgba(180,150,60,0.2) 6px)"></div> No price set</div>
           <div class="legend-item" id="legendRestartCheckin" style="display:none"><div class="legend-dot" style="background:var(--cream);border:1px dashed var(--stone)"></div> Not a checkout option — click to change check-in</div>
         </div>
@@ -1492,6 +1502,15 @@
     return bookedRanges.some(r => date.getTime() === r.start.getTime());
   }
 
+  function isTurnoverOut(y, m, d) {
+    // Another stay checks out this morning (day after its last night)
+    const date = new Date(y, m, d); date.setHours(0,0,0,0);
+    return bookedRanges.some(r => {
+      const co = new Date(r.end); co.setDate(co.getDate() + 1);
+      return date.getTime() === co.getTime();
+    });
+  }
+
   // A night that cannot be part of any stay at all: booked, blocks passing
   // through (another stay's check-in day), or has no price defined.
   function isBlockedNight(y, m, d) {
@@ -1528,7 +1547,12 @@
     for (let i = 1; i <= LOOKBACK; i++) {
       const s = new Date(date); s.setDate(s.getDate() - i);
       const run = maxConsecutiveNightsFrom(s);
-      if (i <= run && i >= getMinNights(s)) return true;
+      // A stay from s can run to s + run, so any date up to there is either
+      // one of its nights or its checkout. (Requiring i >= min stay here
+      // wrongly greyed out the middle nights of short gaps, e.g. 22-23 Dec
+      // inside a bookable 21-24 Dec stay.)
+      if (run === 0) break;
+      if (run >= getMinNights(s) && i <= run) return true;
     }
     return false;
   }
@@ -1616,7 +1640,7 @@
       minNightsRequired = getMinNights(sDateForMin);
     }
 
-    let anyBelowMin = false, anyNoPrice = false, anyRestartCheckin = false;
+    let anyBelowMin = false, anyNoPrice = false, anyRestartCheckin = false, anyTurnover = false, anyMinStay = false;
 
     for (let d = 1; d <= daysInMonth; d++) {
       const el = document.createElement('div');
@@ -1628,7 +1652,11 @@
       const past          = thisDate < today;
       const soon          = tooSoon(thisDate);
 
-      if (fullyBooked) {
+      const turnIn  = !fullyBooked && isCheckoutOnly(viewYear, viewMonth, d);
+      const turnOut = !fullyBooked && isTurnoverOut(viewYear, viewMonth, d);
+
+      if (fullyBooked || (turnIn && turnOut)) {
+        // Both halves taken (one guest leaves, another arrives) = no gap at all
         el.classList.add('booked');
       } else if (past || soon) {
         el.classList.add('past');
@@ -1651,7 +1679,13 @@
           const crossesBlocked = nights > 0 && rangeHasBlockedDates(sDateForMin, thisDate);
           const belowMin = nights > 0 && nights < minNightsRequired;
           const aboveMax = nights > MAX_STAY_NIGHTS;
-          if (nights > 0 && (belowMin || crossesBlocked || aboveMax)) {
+          if (nights > 0 && belowMin && !crossesBlocked) {
+            // Part of the stay, just too early to check out. Tinted as part
+            // of the stay rather than hatched, so it doesn't read as booked.
+            el.classList.add('min-stay');
+            el.title = `Minimum stay for these dates is ${minNightsRequired} nights`;
+            anyMinStay = true;
+          } else if (nights > 0 && (belowMin || crossesBlocked || aboveMax)) {
             el.classList.add('below-min');
             el.title = aboveMax ? `The longest single stay is ${MAX_STAY_NIGHTS} nights` : (belowMin ? `Minimum stay for these dates is ${minNightsRequired} nights` : 'Includes unavailable dates');
             anyBelowMin = true;
@@ -1677,10 +1711,17 @@
         el.addEventListener('click', () => selectDay(viewYear, viewMonth, d));
       }
 
+      if (el.classList.contains('available') && (turnIn || turnOut)) {
+        el.classList.add(turnIn ? 'turn-in' : 'turn-out');
+        if (!el.title) el.title = turnIn ? 'Changeover day: checkout only (another guest arrives that afternoon)' : 'Changeover day: check-in from 3pm (another guest leaves that morning)';
+        anyTurnover = true;
+      }
+
       if (thisDate.getTime() === today.getTime()) el.classList.add('today');
       if (selStart) {
         const sDate = new Date(selStart.y, selStart.m, selStart.d);
         const eDate = selEnd ? new Date(selEnd.y, selEnd.m, selEnd.d) : null;
+        if (thisDate.getTime() === sDate.getTime() || (eDate && thisDate.getTime() === eDate.getTime())) el.classList.remove('turn-in', 'turn-out');
         if (thisDate.getTime() === sDate.getTime())                    el.classList.add('checkin');
         else if (eDate && thisDate.getTime() === eDate.getTime())      el.classList.add('checkout');
         else if (eDate && thisDate > sDate && thisDate < eDate)        el.classList.add('in-range');
@@ -1690,6 +1731,12 @@
 
     const legendBelowMin = document.getElementById('legendBelowMin');
     if (legendBelowMin) legendBelowMin.style.display = anyBelowMin ? 'flex' : 'none';
+    const legendBelowMinText = document.getElementById('legendBelowMinText');
+    if (legendBelowMinText) legendBelowMinText.textContent = pickingCheckout ? 'Not possible with this check-in' : 'Gap too short to book';
+    const legendTurnover = document.getElementById('legendTurnover');
+    if (legendTurnover) legendTurnover.style.display = anyTurnover ? 'flex' : 'none';
+    const legendMinStay = document.getElementById('legendMinStay');
+    if (legendMinStay) legendMinStay.style.display = anyMinStay ? 'flex' : 'none';
     const legendNoPrice = document.getElementById('legendNoPrice');
     if (legendNoPrice) legendNoPrice.style.display = anyNoPrice ? 'flex' : 'none';
     const legendRestartCheckin = document.getElementById('legendRestartCheckin');
