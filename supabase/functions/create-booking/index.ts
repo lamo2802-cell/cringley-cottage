@@ -43,8 +43,9 @@ async function loadRates(supabase: any) {
 }
 
 async function loadSettings(supabase: any) {
-  const { data } = await supabase.from("site_settings").select("min_advance_nights, deposit_percent, full_payment_window_days, week_discount_percent, dog_surcharge_enabled, dog_surcharge_amount").eq("id", 1).maybeSingle();
+  const { data } = await supabase.from("site_settings").select("min_advance_nights, deposit_percent, full_payment_window_days, week_discount_percent, dog_surcharge_enabled, dog_surcharge_amount, deals_stack_with_codes").eq("id", 1).maybeSingle();
   return {
+    dealsStackWithCodes: data?.deals_stack_with_codes ?? false,
     minAdvanceNights: data?.min_advance_nights ?? 2,
     depositRate: (data?.deposit_percent ?? 25) / 100,
     fullPaymentWindowDays: data?.full_payment_window_days ?? 14,
@@ -71,23 +72,75 @@ async function validateDiscountCode(supabase: any, code: string) {
   return row;
 }
 
+type Deal = { id: string; title: string; percent_off: number; stay_from: string; stay_to: string; min_nights?: number | null; book_from?: string | null; book_by?: string | null; active?: boolean };
+
+// Today's date in the UK, as YYYY-MM-DD. Deals open and close on UK dates.
+function ukToday(): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/London", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+}
+
+// Deals that can be booked today. The deal itself is re-checked here rather
+// than trusting anything the booking page sent.
+async function loadLiveDeals(supabase: any): Promise<Deal[]> {
+  const today = ukToday();
+  const { data } = await supabase.from("deals")
+    .select("id, title, percent_off, stay_from, stay_to, min_nights, book_from, book_by, active")
+    .eq("active", true).gte("stay_to", today);
+  return (data || []).filter((d: Deal) => (!d.book_from || d.book_from <= today) && (!d.book_by || d.book_by >= today));
+}
+
+function stayNights(checkin: string, checkout: string): string[] {
+  const out: string[] = [];
+  const start = new Date(checkin + "T00:00:00");
+  const end = new Date(checkout + "T00:00:00");
+  const nights = Math.round((end.getTime() - start.getTime()) / 86400000);
+  for (let i = 0; i < nights; i++) {
+    const d = new Date(start); d.setDate(d.getDate() + i);
+    out.push(d.toISOString().slice(0, 10));
+  }
+  return out;
+}
+
+// The one deal that saves this stay the most (deals never combine).
+function bestDeal(checkin: string, checkout: string, rates: { from: string; to: string; rate: number }[], deals: Deal[]): Deal | null {
+  const nights = stayNights(checkin, checkout);
+  let best: Deal | null = null, bestSaving = 0;
+  for (const d of deals) {
+    if (d.min_nights && nights.length < d.min_nights) continue;
+    const saving = dealSaving(nights, rates, d);
+    if (saving > bestSaving) { best = d; bestSaving = saving; }
+  }
+  return best;
+}
+
+function dealSaving(nights: string[], rates: { from: string; to: string; rate: number }[], deal: { percent_off: number; stay_from: string; stay_to: string } | null): number {
+  if (!deal) return 0;
+  let saving = 0;
+  for (const n of nights) {
+    if (n >= deal.stay_from && n <= deal.stay_to) saving += Math.round(rateFor(n, rates) * Number(deal.percent_off)) / 100;
+  }
+  return Math.round(saving * 100) / 100;
+}
+
+// Order: nightly rates, less any deal on the nights it covers, less the
+// 7-night discount, less a discount code, plus the dog fee.
 function computePricing(
   checkin: string, checkout: string,
   rates: { from: string; to: string; rate: number }[],
   settings: { depositRate: number; fullPaymentWindowDays: number; weekDiscount: number; dogSurchargeEnabled: boolean; dogSurchargeAmount: number },
   discountPercent: number,
-  hasDog: boolean
+  hasDog: boolean,
+  deal: { percent_off: number; stay_from: string; stay_to: string } | null = null
 ) {
   const start = new Date(checkin + "T00:00:00");
-  const end = new Date(checkout + "T00:00:00");
-  const nights = Math.round((end.getTime() - start.getTime()) / 86400000);
+  const nightList = stayNights(checkin, checkout);
+  const nights = nightList.length;
   let total = 0;
-  for (let i = 0; i < nights; i++) {
-    const d = new Date(start); d.setDate(d.getDate() + i);
-    total += rateFor(d.toISOString().slice(0, 10), rates);
-  }
-  const weekDisc = nights >= 7 ? Math.round(total * settings.weekDiscount) : 0;
-  const afterWeekDiscount = total - weekDisc;
+  for (const n of nightList) total += rateFor(n, rates);
+  const dealAmount = dealSaving(nightList, rates, deal);
+  const afterDeal = Math.round((total - dealAmount) * 100) / 100;
+  const weekDisc = nights >= 7 ? Math.round(afterDeal * settings.weekDiscount) : 0;
+  const afterWeekDiscount = afterDeal - weekDisc;
   const discountAmount = discountPercent > 0 ? Math.round(afterWeekDiscount * (discountPercent / 100) * 100) / 100 : 0;
   // The dog surcharge is a flat fee, added after nightly-rate discounts (it isn't itself discounted).
   const dogSurcharge = (hasDog && settings.dogSurchargeEnabled) ? Number(settings.dogSurchargeAmount) || 0 : 0;
@@ -99,7 +152,7 @@ function computePricing(
   const paymentType = daysUntilCheckin < settings.fullPaymentWindowDays ? "full" : "deposit";
   const amountDue = paymentType === "full" ? finalTotal : deposit;
 
-  return { totalAmount: finalTotal, depositAmount: deposit, paymentType, amountDue, discountAmount, dogSurcharge };
+  return { totalAmount: finalTotal, depositAmount: deposit, paymentType, amountDue, discountAmount, dogSurcharge, dealAmount };
 }
 
 function guestBreakdown(adults: number, children: number): string {
@@ -265,7 +318,7 @@ Deno.serve(async (req: Request) => {
       bookingId = inserted.id; finalCheckin = checkin; finalCheckout = checkout;
     }
 
-    // ─── Discount code ──────────────────────────────────────────────────────────────────────────────────────────────
+    // ─── Discount code ───
     let discountRow: any = null;
     if (discount_code && typeof discount_code === "string") {
       discountRow = await validateDiscountCode(supabase, discount_code);
@@ -275,8 +328,26 @@ Deno.serve(async (req: Request) => {
     }
 
     const rates = await loadRates(supabase);
-    const pricing = computePricing(finalCheckin, finalCheckout, rates, settings, discountRow?.percent_off || 0, !!has_dog);
+    // A live deal for these dates comes off automatically. Unless the owner
+    // lets them stack, a deal and a code don't combine: the guest gets
+    // whichever leaves the lower total (the deal if it's a tie, so the code
+    // isn't used up for nothing).
+    let deal = bestDeal(finalCheckin, finalCheckout, rates, await loadLiveDeals(supabase));
+    let pricing = computePricing(finalCheckin, finalCheckout, rates, settings, discountRow?.percent_off || 0, !!has_dog, deal);
+    if (deal && discountRow && !settings.dealsStackWithCodes) {
+      const dealOnly = computePricing(finalCheckin, finalCheckout, rates, settings, 0, !!has_dog, deal);
+      const codeOnly = computePricing(finalCheckin, finalCheckout, rates, settings, discountRow.percent_off, !!has_dog, null);
+      if (codeOnly.totalAmount < dealOnly.totalAmount) { deal = null; pricing = codeOnly; }
+      else { discountRow = null; pricing = dealOnly; }
+    }
     const guestsCount = adultsCount + childrenCount;
+    let wantsMarketing = marketing_consent === true;
+    if (wantsMarketing) {
+      const { data: saidNo } = await supabase.from("bookings").select("id")
+        .ilike("guest_email", email.trim().replace(/[\\%_]/g, "\\$&"))
+        .eq("marketing_consent", false).not("marketing_basis", "is", null).neq("id", bookingId).limit(1);
+      if (saidNo && saidNo.length) wantsMarketing = false;
+    }
     const fullyDiscounted = pricing.amountDue <= 0;
 
     const baseUpdates: Record<string, unknown> = {
@@ -295,8 +366,14 @@ Deno.serve(async (req: Request) => {
       discount_code: discountRow ? discountRow.code ?? discount_code.trim().toUpperCase() : null,
       discount_percent: discountRow ? discountRow.percent_off : null,
       discount_amount: pricing.discountAmount,
-      marketing_consent: !!marketing_consent,
-      marketing_consent_at: marketing_consent ? new Date().toISOString() : null,
+      deal: deal ? { id: deal.id, title: deal.title, percent_off: Number(deal.percent_off), stay_from: deal.stay_from, stay_to: deal.stay_to } : null,
+      deal_amount: pricing.dealAmount,
+      // The box is ticked for the guest and they can untick it while booking
+      // (PECR soft opt-in for customers). Someone who has said no before,
+      // by unticking it or unsubscribing, stays out.
+      marketing_consent: wantsMarketing,
+      marketing_consent_at: wantsMarketing ? new Date().toISOString() : null,
+      marketing_basis: "soft_opt_in",
       terms_accepted_at: new Date().toISOString(),
     };
 
