@@ -8,7 +8,7 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
 // and are read-only here.
 //
 // If the dates change, price fields (total_amount, deposit_amount,
-// payment_type, amount_due, discount_amount, and balance_due_date if one was
+// payment_type, amount_due, discount_amount, deal_amount, and balance_due_date if one was
 // already set) are recomputed from the current rates/settings — but nothing
 // is charged or refunded via Stripe automatically. The admin UI surfaces
 // that plainly so the owner can collect or refund the difference themselves.
@@ -56,23 +56,46 @@ function rateFor(dateISO: string, rates: { from: string; to: string; rate: numbe
   const found = rates.find(r => dateISO >= r.from && dateISO <= r.to);
   return found ? found.rate : DEFAULT_RATE;
 }
+function stayNights(checkin: string, checkout: string): string[] {
+  const out: string[] = [];
+  const start = new Date(checkin + "T00:00:00");
+  const end = new Date(checkout + "T00:00:00");
+  const nights = Math.round((end.getTime() - start.getTime()) / 86400000);
+  for (let i = 0; i < nights; i++) {
+    const d = new Date(start); d.setDate(d.getDate() + i);
+    out.push(d.toISOString().slice(0, 10));
+  }
+  return out;
+}
+function dealSaving(nights: string[], rates: { from: string; to: string; rate: number }[], deal: { percent_off: number; stay_from: string; stay_to: string } | null): number {
+  if (!deal) return 0;
+  let saving = 0;
+  for (const n of nights) {
+    if (n >= deal.stay_from && n <= deal.stay_to) saving += Math.round(rateFor(n, rates) * Number(deal.percent_off)) / 100;
+  }
+  return Math.round(saving * 100) / 100;
+}
+// Same order as create-booking: nightly rates, less the booking's deal (a
+// copy kept on the booking, so it still applies to any of its new nights
+// that fall in the deal's dates), less the 7-night discount, less the code,
+// plus the dog fee.
 function computePricing(
   checkin: string, checkout: string,
   rates: { from: string; to: string; rate: number }[],
   settings: { depositRate: number; fullPaymentWindowDays: number; weekDiscount: number; dogSurchargeEnabled: boolean; dogSurchargeAmount: number },
   discountPercent: number,
-  hasDog: boolean
+  hasDog: boolean,
+  deal: { percent_off: number; stay_from: string; stay_to: string } | null = null
 ) {
   const start = new Date(checkin + "T00:00:00");
-  const end = new Date(checkout + "T00:00:00");
-  const nights = Math.round((end.getTime() - start.getTime()) / 86400000);
+  const nightList = stayNights(checkin, checkout);
+  const nights = nightList.length;
   let total = 0;
-  for (let i = 0; i < nights; i++) {
-    const d = new Date(start); d.setDate(d.getDate() + i);
-    total += rateFor(d.toISOString().slice(0, 10), rates);
-  }
-  const weekDisc = nights >= 7 ? Math.round(total * settings.weekDiscount) : 0;
-  const afterWeekDiscount = total - weekDisc;
+  for (const n of nightList) total += rateFor(n, rates);
+  const dealAmount = dealSaving(nightList, rates, deal);
+  const afterDeal = Math.round((total - dealAmount) * 100) / 100;
+  const weekDisc = nights >= 7 ? Math.round(afterDeal * settings.weekDiscount) : 0;
+  const afterWeekDiscount = afterDeal - weekDisc;
   const discountAmount = discountPercent > 0 ? Math.round(afterWeekDiscount * (discountPercent / 100) * 100) / 100 : 0;
   // The dog surcharge is a flat fee, added after nightly-rate discounts (it isn't itself discounted).
   const dogSurcharge = (hasDog && settings.dogSurchargeEnabled) ? Number(settings.dogSurchargeAmount) || 0 : 0;
@@ -82,7 +105,7 @@ function computePricing(
   const daysUntilCheckin = Math.round((start.getTime() - today.getTime()) / 86400000);
   const paymentType = daysUntilCheckin < settings.fullPaymentWindowDays ? "full" : "deposit";
   const amountDue = paymentType === "full" ? finalTotal : deposit;
-  return { totalAmount: finalTotal, depositAmount: deposit, paymentType, amountDue, discountAmount, dogSurcharge };
+  return { totalAmount: finalTotal, depositAmount: deposit, paymentType, amountDue, discountAmount, dogSurcharge, dealAmount };
 }
 
 Deno.serve(async (req: Request) => {
@@ -168,7 +191,7 @@ Deno.serve(async (req: Request) => {
       if (datesChanged || dogChanged) {
         const rates = await loadRates(supabase);
         const settings = await loadSettings(supabase);
-        const pricing = computePricing(finalCheckin, finalCheckout, rates, settings, booking.discount_percent || 0, finalHasDog);
+        const pricing = computePricing(finalCheckin, finalCheckout, rates, settings, booking.discount_percent || 0, finalHasDog, booking.deal || null);
 
         updates.checkin = finalCheckin;
         updates.checkout = finalCheckout;
@@ -177,6 +200,7 @@ Deno.serve(async (req: Request) => {
         updates.payment_type = pricing.paymentType;
         updates.amount_due = pricing.amountDue;
         updates.discount_amount = pricing.discountAmount;
+        updates.deal_amount = pricing.dealAmount;
         if (booking.balance_due_date) {
           const d = new Date(finalCheckin + "T00:00:00");
           d.setDate(d.getDate() - settings.fullPaymentWindowDays);

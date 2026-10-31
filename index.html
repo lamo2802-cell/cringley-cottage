@@ -971,9 +971,51 @@
   @media (max-width: 640px) {
     .float-book { right: 14px; bottom: 14px; padding: 0.75rem 1.15rem; font-size: 0.76rem; }
   }
+  /* DEALS: hero line, popup and calendar marker */
+  .hero-deal {
+    display: inline-block; max-width: 34rem; margin: 0 0 1.4rem;
+    background: rgba(132,164,114,0.92); color: var(--ink); text-decoration: none;
+    font-size: 0.86rem; line-height: 1.4; padding: 0.55rem 1rem; border-radius: 2px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.25);
+  }
+  .hero-deal strong { font-weight: 600; }
+  .hero-deal:hover { background: var(--sage-light); }
+  .deal-popup {
+    position: fixed; left: 22px; bottom: 22px; z-index: 120; max-width: 340px; width: calc(100% - 44px);
+    background: var(--ink); color: var(--cream); border: 1px solid rgba(247,242,234,0.15);
+    border-radius: 4px; box-shadow: 0 12px 36px rgba(0,0,0,0.35); padding: 1.3rem 1.3rem 1.1rem;
+    opacity: 0; transform: translateY(14px); pointer-events: none;
+    transition: opacity 0.3s ease, transform 0.3s ease;
+  }
+  .deal-popup.visible { opacity: 1; transform: translateY(0); pointer-events: auto; }
+  .deal-popup .dp-tag { font-size: 0.68rem; letter-spacing: 0.16em; text-transform: uppercase; color: var(--sage-light); margin-bottom: 0.4rem; }
+  .deal-popup .dp-title { font-family: 'Cormorant Garamond', serif; font-size: 1.55rem; line-height: 1.15; margin: 0 0 0.5rem; padding-right: 1.5rem; }
+  .deal-popup .dp-text { font-size: 0.86rem; line-height: 1.55; color: rgba(247,242,234,0.8); margin: 0 0 0.4rem; }
+  .deal-popup .dp-terms { font-size: 0.74rem; color: rgba(247,242,234,0.55); margin: 0 0 1rem; }
+  .deal-popup .dp-cta { display: inline-block; background: var(--sage); color: var(--cream); text-decoration: none; font-size: 0.76rem; letter-spacing: 0.1em; text-transform: uppercase; padding: 0.7rem 1.2rem; border-radius: 2px; border: none; cursor: pointer; font-family: inherit; }
+  .deal-popup .dp-cta:hover { background: var(--sage-light); }
+  .deal-popup .dp-close { position: absolute; top: 0.6rem; right: 0.7rem; background: none; border: none; color: rgba(247,242,234,0.6); font-size: 1.4rem; line-height: 1; cursor: pointer; padding: 0.2rem 0.4rem; }
+  .deal-popup .dp-close:hover { color: var(--cream); }
+  @media (max-width: 640px) {
+    .deal-popup { left: 14px; right: 14px; bottom: 76px; width: auto; max-width: none; }
+  }
+  .cal-day.deal::before {
+    content: '%'; position: absolute; top: 2px; right: 4px;
+    font-size: 0.58rem; font-weight: 600; color: var(--sage); line-height: 1;
+  }
+  .cal-day.deal.available:hover::before, .cal-day.deal.checkin::before, .cal-day.deal.checkout::before { color: var(--cream); }
 </style>
 </head>
 <body>
+
+<div class="deal-popup" id="dealPopup" role="dialog" aria-labelledby="dealPopupTitle" aria-hidden="true">
+  <button type="button" class="dp-close" id="dealPopupClose" aria-label="Close offer">&times;</button>
+  <div class="dp-tag">Book direct offer</div>
+  <h2 class="dp-title" id="dealPopupTitle"></h2>
+  <p class="dp-text" id="dealPopupText"></p>
+  <p class="dp-terms" id="dealPopupTerms"></p>
+  <button type="button" class="dp-cta" id="dealPopupCta">See dates</button>
+</div>
 
 <a href="#availability" class="float-book" id="floatBookBtn">&#128197; Book Now<span class="fb-price" id="floatBookPrice" style="display:none"></span></a>
 
@@ -1002,6 +1044,7 @@
     <h1 class="hero-title">Cringley<br><em>Cottage</em></h1>
     <p class="hero-sub">Two bedrooms, a log burning stove, and a garden — in the heart of the Yorkshire Dales.</p>
     <p class="hero-herriot">In Herriot's Darrowby: a short stroll from the original Skeldale House from <em>All Creatures Great and Small</em>.</p>
+    <a href="#availability" class="hero-deal" id="heroDeal" style="display:none"></a>
     <div class="hero-actions">
       <a href="#availability" class="btn-primary">Check Availability</a>
       <a href="#about" class="btn-outline">Discover More</a>
@@ -1249,6 +1292,7 @@
         <div class="cal-legend">
           <div class="legend-item"><div class="legend-dot" style="background:var(--white);border:1px solid var(--stone)"></div> Available</div>
           <div class="legend-item"><div class="legend-dot" style="background:var(--sage)"></div> Selected</div>
+          <div class="legend-item" id="legendDeal" style="display:none"><span style="font-size:0.7rem;font-weight:600;color:var(--sage);width:12px;text-align:center">%</span> <span id="legendDealText">Offer price</span></div>
           <div class="legend-item"><div class="legend-dot" style="background:rgba(122,112,96,0.15)"></div> Unavailable</div>
           <div class="legend-item" id="legendBelowMin" style="display:none"><div class="legend-dot" style="background:repeating-linear-gradient(45deg, transparent, transparent 3px, rgba(122,112,96,0.15) 3px, rgba(122,112,96,0.15) 6px)"></div> <span id="legendBelowMinText">Gap too short to book</span></div>
           <div class="legend-item" id="legendTurnover" style="display:none"><div class="legend-dot" style="background:linear-gradient(135deg, var(--white) 50%, rgba(122,112,96,0.3) 50%);border:1px solid var(--stone)"></div> Changeover day (half taken)</div>
@@ -1376,8 +1420,8 @@
           </div>
 
           <label for="bpMarketingConsent" style="margin:0 0 1rem;display:flex;align-items:flex-start;gap:0.7rem;background:rgba(247,242,234,0.05);border:1px solid rgba(247,242,234,0.12);border-radius:2px;padding:0.75rem 0.9rem;cursor:pointer;color:var(--cream);">
-            <input type="checkbox" id="bpMarketingConsent" style="width:20px;height:20px;flex-shrink:0;margin-top:0.1rem;accent-color:var(--sage);cursor:pointer;">
-            <span style="font-size:0.82rem;line-height:1.5;">I'd like to receive occasional offers and updates from Cringley Cottage by email. (Optional — you can unsubscribe any time.)</span>
+            <input type="checkbox" id="bpMarketingConsent" checked style="width:20px;height:20px;flex-shrink:0;margin-top:0.1rem;accent-color:var(--sage);cursor:pointer;">
+            <span style="font-size:0.82rem;line-height:1.5;">Send me occasional offers and news from Cringley Cottage by email. Untick this box if you'd rather not hear from us. You can also unsubscribe from any email.</span>
           </label>
 
           <label for="bpTermsAccepted" style="margin:0 0 1rem;display:flex;align-items:flex-start;gap:0.7rem;background:rgba(247,242,234,0.05);border:1px solid rgba(247,242,234,0.12);border-radius:2px;padding:0.75rem 0.9rem;cursor:pointer;color:var(--cream);">
@@ -1537,6 +1581,7 @@
     return new Date(y, m - 1, d);
   }
 
+  function escapeHtmlText(s) { return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
   // Whole pounds as "£120", anything with pence as "£120.50".
   function fmtGBP(n) {
     const r = Math.round(n * 100) / 100;
@@ -1690,6 +1735,115 @@
     applyPricingCopy();
   }
 
+
+  // ─── DEALS ──────────────────────────────────────────────────────
+  // Set up in admin (Deals). The database only hands out deals that can be
+  // booked today. create-booking works the price out again on its own, so
+  // what's shown here is a preview of the same rules, not the source of them.
+  let LIVE_DEALS = [];
+  let DEALS_STACK_WITH_CODES = false;
+  async function loadDeals() {
+    try {
+      const hdrs = { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` };
+      const [dRes, sRes] = await Promise.all([
+        fetch(`${SUPABASE_URL}/rest/v1/deals?select=id,title,description,percent_off,stay_from,stay_to,book_by,min_nights,show_popup&order=stay_from.asc`, { headers: hdrs }),
+        fetch(`${SUPABASE_URL}/rest/v1/site_settings?select=deals_stack_with_codes&id=eq.1`, { headers: hdrs }),
+      ]);
+      if (dRes.ok) {
+        const rows = await dRes.json();
+        if (Array.isArray(rows)) LIVE_DEALS = rows.filter(d => d && d.stay_from && d.stay_to && Number(d.percent_off) > 0);
+      }
+      if (sRes.ok) {
+        const rows = await sRes.json();
+        if (Array.isArray(rows) && rows[0]) DEALS_STACK_WITH_CODES = !!rows[0].deals_stack_with_codes;
+      }
+    } catch (e) { /* no deals shown */ }
+  }
+  function dealPct(d) { const n = Number(d.percent_off); return Number.isInteger(n) ? n : n.toFixed(1).replace(/\.0$/, ''); }
+  // The biggest deal covering one night (for the calendar marker).
+  function dealForNight(iso) {
+    let best = null;
+    for (const d of LIVE_DEALS) if (iso >= d.stay_from && iso <= d.stay_to && (!best || Number(d.percent_off) > Number(best.percent_off))) best = d;
+    return best;
+  }
+  function stayNightISOs(ci, co) {
+    const out = [];
+    const s = parseLocalDate(ci), e = parseLocalDate(co);
+    for (let d = new Date(s); d < e; d.setDate(d.getDate() + 1)) out.push(toLocalISODate(d));
+    return out;
+  }
+  // Pence-rounded per night, exactly as create-booking does it.
+  function dealSavingFor(nights, deal) {
+    if (!deal) return 0;
+    let saving = 0;
+    for (const n of nights) if (n >= deal.stay_from && n <= deal.stay_to) saving += Math.round(nightRate(parseLocalDate(n)) * Number(deal.percent_off)) / 100;
+    return Math.round(saving * 100) / 100;
+  }
+  function dealNightsCount(nights, deal) { return deal ? nights.filter(n => n >= deal.stay_from && n <= deal.stay_to).length : 0; }
+  // One deal per stay: the one that saves the most.
+  function bestDealFor(ci, co) {
+    const nights = stayNightISOs(ci, co);
+    let best = null, bestSaving = 0;
+    for (const d of LIVE_DEALS) {
+      if (d.min_nights && nights.length < d.min_nights) continue;
+      const saving = dealSavingFor(nights, d);
+      if (saving > bestSaving) { best = d; bestSaving = saving; }
+    }
+    return best;
+  }
+  function fmtShortDate(iso) { return parseLocalDate(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }); }
+  function fmtLongDate(iso) { return parseLocalDate(iso).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' }); }
+  function dealWindowText(d) {
+    const sameYear = d.stay_from.slice(0, 4) === d.stay_to.slice(0, 4);
+    return d.stay_from === d.stay_to ? `the night of ${fmtShortDate(d.stay_from)}` : `nights from ${fmtShortDate(d.stay_from)} to ${fmtShortDate(d.stay_to)}${sameYear ? '' : ' ' + d.stay_to.slice(0, 4)}`;
+  }
+  function dealTermsText(d) {
+    const bits = [];
+    if (d.book_by) bits.push(`Book by ${fmtLongDate(d.book_by)}.`);
+    if (d.min_nights) bits.push(`Stays of ${d.min_nights}+ nights.`);
+    bits.push(DEALS_STACK_WITH_CODES ? 'Can be used with a discount code.' : "Can't be combined with a discount code.");
+    return bits.join(' ');
+  }
+  function jumpToDeal(d) {
+    const first = parseLocalDate(d.stay_from);
+    const start = first < today ? new Date(today) : first;
+    viewYear = start.getFullYear(); viewMonth = start.getMonth();
+    buildCal();
+    document.getElementById('availability').scrollIntoView({ behavior: 'smooth' });
+  }
+  function showDeals() {
+    if (!LIVE_DEALS.length) return;
+    // Hero line: the biggest deal on offer.
+    const top = LIVE_DEALS.slice().sort((a, b) => Number(b.percent_off) - Number(a.percent_off))[0];
+    const hero = document.getElementById('heroDeal');
+    if (hero) {
+      hero.innerHTML = '';
+      const strong = document.createElement('strong');
+      strong.textContent = `${dealPct(top)}% off`;
+      hero.appendChild(strong);
+      hero.appendChild(document.createTextNode(` ${top.title} · ${dealWindowText(top)}${top.book_by ? ' · book by ' + fmtShortDate(top.book_by) : ''}`));
+      hero.style.display = '';
+      hero.addEventListener('click', (e) => { e.preventDefault(); jumpToDeal(top); });
+    }
+    // Popup: once per visit, for the first deal set to pop up.
+    const pop = LIVE_DEALS.find(d => d.show_popup);
+    if (!pop) return;
+    const seenKey = 'cc_deal_seen_' + pop.id;
+    try { if (sessionStorage.getItem(seenKey)) return; } catch (e) {}
+    document.getElementById('dealPopupTitle').textContent = `${dealPct(pop)}% off ${pop.title}`;
+    document.getElementById('dealPopupText').textContent = (pop.description ? pop.description + ' ' : '') + `${dealPct(pop)}% off the nightly price for ${dealWindowText(pop)}, taken off automatically when you book here.`;
+    document.getElementById('dealPopupTerms').textContent = dealTermsText(pop);
+    const el = document.getElementById('dealPopup');
+    const close = () => {
+      el.classList.remove('visible'); el.setAttribute('aria-hidden', 'true');
+      try { sessionStorage.setItem(seenKey, '1'); } catch (e) {}
+    };
+    document.getElementById('dealPopupClose').addEventListener('click', close);
+    document.getElementById('dealPopupCta').addEventListener('click', () => { close(); jumpToDeal(pop); });
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && el.classList.contains('visible')) close(); });
+    setTimeout(() => { el.classList.add('visible'); el.setAttribute('aria-hidden', 'false'); }, 2500);
+  }
+
   // Updates every piece of static marketing text that quotes the deposit %,
   // discount %, or full-payment window — single source of truth, no more
   // risk of the page contradicting what's actually charged.
@@ -1739,7 +1893,7 @@
       minNightsRequired = getMinNights(sDateForMin);
     }
 
-    let anyBelowMin = false, anyNoPrice = false, anyRestartCheckin = false, anyTurnover = false, anyMinStay = false;
+    let anyBelowMin = false, anyNoPrice = false, anyRestartCheckin = false, anyTurnover = false, anyMinStay = false, anyDeal = false;
 
     for (let d = 1; d <= daysInMonth; d++) {
       const el = document.createElement('div');
@@ -1816,6 +1970,15 @@
         anyTurnover = true;
       }
 
+      if (!past && !soon && !fullyBooked && priced) {
+        const dl = dealForNight(toLocalISODate(thisDate));
+        if (dl) {
+          el.classList.add('deal');
+          el.title = (el.title ? el.title + ' · ' : '') + `${dealPct(dl)}% off: ${dl.title}`;
+          anyDeal = true;
+        }
+      }
+
       if (thisDate.getTime() === today.getTime()) el.classList.add('today');
       if (selStart) {
         const sDate = new Date(selStart.y, selStart.m, selStart.d);
@@ -1838,6 +2001,8 @@
     if (legendMinStay) legendMinStay.style.display = anyMinStay ? 'flex' : 'none';
     const legendNoPrice = document.getElementById('legendNoPrice');
     if (legendNoPrice) legendNoPrice.style.display = anyNoPrice ? 'flex' : 'none';
+    const legendDeal = document.getElementById('legendDeal');
+    if (legendDeal) legendDeal.style.display = anyDeal ? 'flex' : 'none';
     const legendRestartCheckin = document.getElementById('legendRestartCheckin');
     if (legendRestartCheckin) legendRestartCheckin.style.display = anyRestartCheckin ? 'flex' : 'none';
   }
@@ -2029,18 +2194,27 @@
       breakdown[r] = (breakdown[r] || 0) + 1;
     }
     const isWeek    = nights >= 7;
-    const discount  = isWeek ? Math.round(total * WEEK_DISCOUNT) : 0;
-    const finalTotal = total - discount;
+    const deal      = bestDealFor(ci, co);
+    const nightISOs = stayNightISOs(ci, co);
+    const dealAmt   = dealSavingFor(nightISOs, deal);
+    const afterDeal = Math.round((total - dealAmt) * 100) / 100;
+    const discount  = isWeek ? Math.round(afterDeal * WEEK_DISCOUNT) : 0;
+    const finalTotal = Math.round((afterDeal - discount) * 100) / 100;
     const deposit   = Math.round(finalTotal * DEPOSIT_RATE);
     let lines = '';
     for (const [rate, count] of Object.entries(breakdown))
       lines += `<div class="bp-line"><span>${count} night${count>1?'s':''} × £${rate}/night</span><span>£${count*rate}</span></div>`;
+    if (deal) {
+      const dn = dealNightsCount(nightISOs, deal);
+      const dealLabel = `${escapeHtmlText(deal.title)}: ${dealPct(deal)}% off ${dn === nights ? 'every night' : dn + ' night' + (dn !== 1 ? 's' : '')}`;
+      lines += `<div class="bp-line" style="color:var(--sage-light)"><span>${dealLabel}</span><span style="white-space:nowrap">−${fmtGBP(dealAmt)}</span></div>`;
+    }
     if (isWeek) lines += `<div class="bp-line" style="color:var(--sage-light)"><span>7-night discount (${Math.round(WEEK_DISCOUNT*100)}%)</span><span>−£${discount}</span></div>`;
     summary.innerHTML = lines +
-      `<div class="bp-line total"><span>Total</span><span>£${finalTotal}</span></div>` +
+      `<div class="bp-line total"><span>Total</span><span>${fmtGBP(finalTotal)}</span></div>` +
       `<div class="bp-line"><span>${Math.round(DEPOSIT_RATE*100)}% deposit to secure</span><span>£${deposit}</span></div>`;
     const priceField = document.getElementById('enqPrice');
-    if (priceField) priceField.value = `£${finalTotal} for ${nights} night${nights!==1?'s':''}`;
+    if (priceField) priceField.value = `${fmtGBP(finalTotal)} for ${nights} night${nights!==1?'s':''}`;
     setBpSubmitEnabled(true);
   }
 
@@ -2061,30 +2235,48 @@
     const guests = getGuestCounts().total;
     const hasDog = document.getElementById('bpHasDog').checked;
     const nights = Math.round((parseLocalDate(co) - parseLocalDate(ci)) / 86400000);
+    const nightISOs = stayNightISOs(ci, co);
     let total = 0;
-    for (let i = 0; i < nights; i++) {
-      const d = parseLocalDate(ci); d.setDate(d.getDate() + i);
-      total += nightRate(d);
-    }
+    for (const n of nightISOs) total += nightRate(parseLocalDate(n));
     const isWeek = nights >= 7;
-    const afterWeek = total - (isWeek ? Math.round(total * WEEK_DISCOUNT) : 0);
-    // Rounded to the penny, exactly as create-booking works it out.
-    const discountAmt = appliedDiscountPercent > 0 ? Math.round(afterWeek * (appliedDiscountPercent / 100) * 100) / 100 : 0;
-    // The pet surcharge is a flat fee on top — it isn't itself subject to the week or code discount.
     const dogSurcharge = (hasDog && DOG_SURCHARGE_ENABLED) ? DOG_SURCHARGE_AMOUNT : 0;
-    const finalTotal = Math.max(0, Math.round((afterWeek - discountAmt) * 100) / 100) + dogSurcharge;
+    // Same order as create-booking: deal, then 7-night discount, then code
+    // (each rounded to the penny), then the pet fee, which isn't discounted.
+    const priceWith = (deal, codePct) => {
+      const dealAmt = dealSavingFor(nightISOs, deal);
+      const afterDeal = Math.round((total - dealAmt) * 100) / 100;
+      const afterWeek = afterDeal - (isWeek ? Math.round(afterDeal * WEEK_DISCOUNT) : 0);
+      const discountAmt = codePct > 0 ? Math.round(afterWeek * (codePct / 100) * 100) / 100 : 0;
+      const finalTotal = Math.max(0, Math.round((afterWeek - discountAmt) * 100) / 100) + dogSurcharge;
+      return { deal, dealAmt, afterWeek, discountAmt, finalTotal, codeUsed: codePct > 0 };
+    };
+    const deal = bestDealFor(ci, co);
+    let pick = priceWith(deal, appliedDiscountPercent);
+    // Unless the owner lets them stack, the guest gets whichever of the deal
+    // and the code leaves the lower total (the deal on a tie).
+    let codeSetAside = false, dealSetAside = false;
+    if (deal && appliedDiscountPercent > 0 && !DEALS_STACK_WITH_CODES) {
+      const dealOnly = priceWith(deal, 0), codeOnly = priceWith(null, appliedDiscountPercent);
+      if (codeOnly.finalTotal < dealOnly.finalTotal) { pick = codeOnly; dealSetAside = true; }
+      else { pick = dealOnly; codeSetAside = true; }
+    }
+    const { dealAmt, afterWeek, discountAmt, finalTotal } = pick;
     const today0 = new Date(); today0.setHours(0,0,0,0);
     const daysUntil = Math.round((parseLocalDate(ci) - today0) / 86400000);
     const isFullPayment = daysUntil < FULL_PAYMENT_WINDOW_DAYS;
     const amountDue = finalTotal <= 0 ? 0 : (isFullPayment ? finalTotal : Math.round(finalTotal * DEPOSIT_RATE));
-    return { ci, co, nights, guests, total, isWeek, afterWeek, discountAmt, dogSurcharge, finalTotal, isFullPayment, amountDue };
+    return { ci, co, nights, guests, total, isWeek, afterWeek, discountAmt, dogSurcharge, finalTotal, isFullPayment, amountDue,
+             deal: pick.deal, dealAmt, dealSetAside, codeSetAside, availableDeal: deal };
   }
 
   function refreshStep2PriceSummary() {
     const p = computeStep2Pricing();
     const depositPct = Math.round(DEPOSIT_RATE * 100);
     let html = `${p.ci} → ${p.co} · ${p.nights} night${p.nights!==1?'s':''} · ${p.guests} guest${p.guests!==1?'s':''}<br>`;
+    if (p.dealAmt > 0) html += `${escapeHtmlText(p.deal.title)} (${dealPct(p.deal)}% off): −${fmtGBP(p.dealAmt)}<br>`;
     if (p.discountAmt > 0) html += `Discount code applied (${appliedDiscountCode}): −${fmtGBP(p.discountAmt)}<br>`;
+    if (p.codeSetAside) html += `<span style="opacity:0.75">The offer saves you more than code ${escapeHtmlText(appliedDiscountCode)}, so we've used the offer. They can't be combined.</span><br>`;
+    if (p.dealSetAside) html += `<span style="opacity:0.75">Code ${escapeHtmlText(appliedDiscountCode)} saves you more than the ${escapeHtmlText(p.availableDeal.title)} offer, so we've used the code. They can't be combined.</span><br>`;
     if (p.dogSurcharge > 0) html += `Pet surcharge: +£${p.dogSurcharge}<br>`;
     if (p.finalTotal <= 0) {
       html += `Total £0 · Fully covered by discount code — no payment needed`;
@@ -2620,8 +2812,10 @@
   const _statusEl = document.getElementById('icalStatus');
   if (_statusEl) _statusEl.textContent = 'Loading availability…';
   (async () => {
-    try { await Promise.all([loadRatesFromSheet(), loadBookingSettings(), releaseCancelledPayment()]); } catch(e) {}
+    try { await Promise.all([loadRatesFromSheet(), loadBookingSettings(), releaseCancelledPayment(), loadDeals()]); } catch(e) {}
     showFromPrice();
+    showDeals();
+    buildCal();
     await syncCalendar();
   })();
 

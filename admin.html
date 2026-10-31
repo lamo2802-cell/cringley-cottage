@@ -453,6 +453,38 @@
       <button id="addReviewBtn" style="background:var(--sage);color:var(--cream);border:none;padding:0.6rem 1.3rem;border-radius:2px;cursor:pointer;font-size:0.8rem;">Add Review</button>
     </div>
 
+    <h2 style="margin-top:2.5rem;">Deals</h2>
+    <p class="sub">A % off the nightly price for nights between two dates, taken off automatically on direct bookings. While a deal is live the home page shows it under the title, marks its nights on the calendar with a %, and (if you tick "Pop-up") shows a small offer card once per visit. Leave "Book from" blank to start now, and "Book by" blank for no end date. The site stops showing a deal after its "Book by" date. Only promise a limited time if the deal really ends then.</p>
+    <div id="dealMsg" style="display:none;"></div>
+    <table id="dealTable" style="margin-bottom:1rem;">
+      <thead><tr><th>Deal</th><th>% off</th><th>Nights</th><th>Bookable</th><th>Min nights</th><th>Pop-up</th><th>Status</th><th></th></tr></thead>
+      <tbody id="dealBody"><tr><td colspan="8" style="color:var(--muted)">Loading…</td></tr></tbody>
+    </table>
+    <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.85rem;margin:0 0 1.2rem;cursor:pointer;">
+      <input type="checkbox" id="dealsStackToggle" style="width:18px;height:18px;accent-color:var(--sage);">
+      Let a deal and a discount code both apply to one booking (when off, the guest gets whichever saves more)
+    </label>
+    <div id="addDealForm" style="margin-bottom:2.5rem;">
+      <h3>Add a deal</h3>
+      <div class="form-grid" style="grid-template-columns:1.6fr 0.6fr 1fr 1fr;">
+        <div><label>Name shown to guests</label><input type="text" id="newDealTitle" maxlength="60" placeholder="e.g. November midweek escape"></div>
+        <div><label>% off</label><input type="number" id="newDealPercent" min="1" max="50" step="0.5" value="15"></div>
+        <div><label>First night</label><input type="date" id="newDealStayFrom"></div>
+        <div><label>Last night</label><input type="date" id="newDealStayTo"></div>
+      </div>
+      <div class="form-grid" style="grid-template-columns:1fr 1fr 0.8fr 0.8fr auto;margin-top:0.7rem;">
+        <div><label>Book from (optional)</label><input type="date" id="newDealBookFrom"></div>
+        <div><label>Book by (optional)</label><input type="date" id="newDealBookBy"></div>
+        <div><label>Min nights (optional)</label><input type="number" id="newDealMinNights" min="1" max="28" placeholder="Any"></div>
+        <div><label style="display:flex;align-items:center;gap:0.4rem;cursor:pointer;margin-bottom:0.7rem;"><input type="checkbox" id="newDealPopup" checked style="width:16px;height:16px;"> Pop-up</label></div>
+        <button id="addDealBtn">Add Deal</button>
+      </div>
+      <div style="margin-top:0.7rem;">
+        <label style="display:block;font-size:0.68rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted);margin-bottom:0.3rem;">Extra line for the pop-up (optional)</label>
+        <input type="text" id="newDealDescription" maxlength="160" placeholder="e.g. Crisp walks, log fire, quiet lanes." style="width:100%;border:1px solid rgba(0,0,0,0.15);border-radius:2px;padding:0.55rem 0.6rem;font-family:'DM Sans',sans-serif;font-size:0.85rem;">
+      </div>
+    </div>
+
     <h2 style="margin-top:2.5rem;">Discount Codes</h2>
     <p class="sub">Create a code and a % off. Set it to 100% to comp a stay entirely — no Stripe payment will be taken for that booking.</p>
     <div id="discountMsg" style="display:none;"></div>
@@ -1434,6 +1466,106 @@
       } else showReviewsMsg('Could not add review.', false);
     });
 
+    // ─── Deals ──────────────────────────────────────────────────────
+    function showDealMsg(text, ok) {
+      const el = document.getElementById('dealMsg');
+      el.textContent = text;
+      el.className = 'msg-box ' + (ok ? 'ok' : 'error');
+      el.style.display = 'block';
+      setTimeout(() => { el.style.display = 'none'; }, 6000);
+    }
+    function ukDateShort(iso) { return iso ? new Date(iso + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : ''; }
+    function ukTodayISO() { return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/London', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date()); }
+    function dealStatus(d) {
+      const t = ukTodayISO();
+      if (!d.active) return 'Switched off';
+      if (d.stay_to < t || (d.book_by && d.book_by < t)) return 'Ended';
+      if (d.book_from && d.book_from > t) return 'Starts ' + ukDateShort(d.book_from);
+      return '<strong style="color:var(--sage)">Live</strong>';
+    }
+
+    async function loadDeals() {
+      const res = await authFetch('/rest/v1/deals?select=*&order=stay_from.desc');
+      const tbody = document.getElementById('dealBody');
+      if (!res) return;
+      if (!res.ok) { tbody.innerHTML = '<tr><td colspan="8" style="color:var(--muted)">Deals need the database update first.</td></tr>'; return; }
+      const rows = await res.json();
+      if (!Array.isArray(rows) || rows.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" style="color:var(--muted)">No deals yet.</td></tr>';
+        return;
+      }
+      tbody.innerHTML = rows.map(d => `
+        <tr data-id="${d.id}" data-active="${d.active ? '1' : '0'}">
+          <td data-label="Deal"><strong>${escapeHtml(d.title)}</strong>${d.description ? '<br><span style="color:var(--muted);font-size:0.8rem">' + escapeHtml(d.description) + '</span>' : ''}</td>
+          <td data-label="% off">${Number(d.percent_off)}%</td>
+          <td data-label="Nights">${ukDateShort(d.stay_from)} to ${ukDateShort(d.stay_to)}</td>
+          <td data-label="Bookable">${d.book_from ? 'From ' + ukDateShort(d.book_from) : 'Now'}${d.book_by ? ' until ' + ukDateShort(d.book_by) : ', no end date'}</td>
+          <td data-label="Min nights">${d.min_nights || 'Any'}</td>
+          <td data-label="Pop-up">${d.show_popup ? 'Yes' : 'No'}</td>
+          <td data-label="Status">${dealStatus(d)}</td>
+          <td class="row-actions">
+            <button class="deal-toggle">${d.active ? 'Switch off' : 'Switch on'}</button>
+            <button class="danger deal-delete">Delete</button>
+          </td>
+        </tr>`).join('');
+    }
+
+    document.getElementById('dealBody').addEventListener('click', async (e) => {
+      const tr = e.target.closest('tr');
+      if (!tr || !tr.dataset.id) return;
+      const id = tr.dataset.id;
+      if (e.target.classList.contains('deal-toggle')) {
+        const res = await authFetch(`/rest/v1/deals?id=eq.${id}`, { method: 'PATCH', body: JSON.stringify({ active: tr.dataset.active !== '1', updated_at: new Date().toISOString() }) });
+        if (res && res.ok) { showDealMsg('Updated.', true); loadDeals(); } else showDealMsg('Update failed.', false);
+      }
+      if (e.target.classList.contains('deal-delete')) {
+        if (!confirm('Delete this deal? It comes off the site straight away. Bookings already made keep their discount.')) return;
+        const res = await authFetch(`/rest/v1/deals?id=eq.${id}`, { method: 'DELETE' });
+        if (res && res.ok) { tr.remove(); showDealMsg('Deleted.', true); } else showDealMsg('Delete failed.', false);
+      }
+    });
+
+    document.getElementById('addDealBtn').addEventListener('click', async () => {
+      const v = id => document.getElementById(id).value.trim();
+      const title = v('newDealTitle');
+      const percent_off = parseFloat(v('newDealPercent'));
+      const stay_from = v('newDealStayFrom'), stay_to = v('newDealStayTo');
+      const book_from = v('newDealBookFrom') || null, book_by = v('newDealBookBy') || null;
+      const minRaw = v('newDealMinNights');
+      const min_nights = minRaw ? parseInt(minRaw, 10) : null;
+      if (!title) { showDealMsg('Give the deal a name guests will see.', false); return; }
+      if (isNaN(percent_off) || percent_off <= 0 || percent_off > 50) { showDealMsg('% off must be more than 0 and at most 50. Use a discount code for bigger discounts.', false); return; }
+      if (!stay_from || !stay_to) { showDealMsg('Choose the first and last night the deal covers.', false); return; }
+      if (stay_to < stay_from) { showDealMsg('The last night must be on or after the first night.', false); return; }
+      if (book_from && book_by && book_by < book_from) { showDealMsg('"Book by" must be on or after "Book from".', false); return; }
+      if (min_nights !== null && (isNaN(min_nights) || min_nights < 1 || min_nights > 28)) { showDealMsg('Min nights must be between 1 and 28.', false); return; }
+      const body = {
+        title, percent_off, stay_from, stay_to, book_from, book_by, min_nights,
+        description: v('newDealDescription') || null,
+        show_popup: document.getElementById('newDealPopup').checked,
+      };
+      const res = await authFetch('/rest/v1/deals', { method: 'POST', headers: { 'Prefer': 'return=minimal' }, body: JSON.stringify(body) });
+      if (res && res.ok) {
+        showDealMsg('Deal added.', true);
+        ['newDealTitle', 'newDealStayFrom', 'newDealStayTo', 'newDealBookFrom', 'newDealBookBy', 'newDealMinNights', 'newDealDescription'].forEach(id => { document.getElementById(id).value = ''; });
+        document.getElementById('newDealPercent').value = '15';
+        document.getElementById('newDealPopup').checked = true;
+        loadDeals();
+      } else showDealMsg('Could not add the deal.', false);
+    });
+
+    async function loadDealsStackSetting() {
+      const res = await authFetch('/rest/v1/site_settings?select=deals_stack_with_codes&id=eq.1');
+      if (!res || !res.ok) return;
+      const rows = await res.json();
+      if (Array.isArray(rows) && rows[0]) document.getElementById('dealsStackToggle').checked = !!rows[0].deals_stack_with_codes;
+    }
+    document.getElementById('dealsStackToggle').addEventListener('change', async (e) => {
+      const res = await authFetch('/rest/v1/site_settings?id=eq.1', { method: 'PATCH', body: JSON.stringify({ deals_stack_with_codes: e.target.checked }) });
+      if (res && res.ok) showDealMsg(e.target.checked ? 'Deals and codes can now both apply.' : 'Guests now get the deal or the code, whichever saves more.', true);
+      else { e.target.checked = !e.target.checked; showDealMsg('Could not save that setting.', false); }
+    });
+
     // ─── Discount codes ──────────────────────────────────────────────
     function showDiscountMsg(text, ok) {
       const el = document.getElementById('discountMsg');
@@ -2113,6 +2245,8 @@
     });
 
     loadOfferTemplate();
+    loadDeals();
+    loadDealsStackSetting();
     loadDiscounts();
     loadClosures();
     loadEmailProblems();
