@@ -318,7 +318,7 @@ Deno.serve(async (req: Request) => {
       bookingId = inserted.id; finalCheckin = checkin; finalCheckout = checkout;
     }
 
-    // ─── Discount code ──────────────────────────────────────────────────────────────────────────────────────────────
+    // ─── Discount code ───
     let discountRow: any = null;
     if (discount_code && typeof discount_code === "string") {
       discountRow = await validateDiscountCode(supabase, discount_code);
