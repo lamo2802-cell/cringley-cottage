@@ -825,6 +825,11 @@
   .walk-card.featured-walk .walk-name { color: var(--cream); }
   .walk-card.featured-walk .walk-desc { color: rgba(243,237,227,0.65); }
   .walk-card.featured-walk .walk-tags span { background: rgba(94,122,82,0.25); color: var(--sage-light); }
+  .walk-clip {
+    display: block; width: 100%; aspect-ratio: 1 / 1; height: auto;
+    object-fit: cover; border-radius: 2px; margin-bottom: 1.2rem;
+    background: var(--stone);
+  }
   .walk-distance {
     font-size: 0.7rem; letter-spacing: 0.18em; text-transform: uppercase;
     color: var(--sage); font-weight: 500; margin-bottom: 0.6rem;
@@ -1168,6 +1173,9 @@
     <div class="g-cell" role="button" tabindex="0" onclick="openLightbox(8)"><img loading="lazy" src="416657903.jpg"     alt="Bedroom welcome touches"><div class="overlay"><span class="g-zoom">&#x2B26;</span></div></div>
     <div class="g-cell" role="button" tabindex="0" onclick="openLightbox(9)"><img loading="lazy" src="413188799.jpg"     alt="Bathroom"><div class="overlay"><span class="g-zoom">&#x2B26;</span></div></div>
     <div class="g-cell" role="button" tabindex="0" onclick="openLightbox(10)"><img loading="lazy" src="moorland.jpg"    alt="Private garden"><div class="overlay"><span class="g-zoom">&#x2B26;</span></div></div>
+    <div class="g-cell" role="button" tabindex="0" onclick="openLightbox(11)"><img loading="lazy" src="416725441.jpg"   alt="Sitting room with log burning stove"><div class="overlay"><span class="g-zoom">&#x2B26;</span></div></div>
+    <div class="g-cell" role="button" tabindex="0" onclick="openLightbox(12)"><img loading="lazy" src="416656974.jpg"   alt="Bedroom with a soft throw"><div class="overlay"><span class="g-zoom">&#x2B26;</span></div></div>
+    <div class="g-cell" role="button" tabindex="0" onclick="openLightbox(13)"><img loading="lazy" src="aysgarth-falls.jpg" alt="Aysgarth Falls from above"><div class="overlay"><span class="g-zoom">&#x2B26;</span></div></div>
   </div>
 </section>
 
@@ -1219,6 +1227,9 @@
     </div>
 
     <div class="walk-card">
+      <video class="walk-clip" id="fallsClip" muted loop playsinline preload="none" poster="aysgarth-falls-poster.jpg" width="640" height="640" aria-label="Aysgarth Falls, filmed from above">
+        <source data-src="aysgarth-falls.mp4" type="video/mp4">
+      </video>
       <div class="walk-distance">6 mi</div>
       <h3 class="walk-name">Aysgarth Falls</h3>
       <p class="walk-desc">The iconic triple-tiered falls made famous by Robin Hood: Prince of Thieves. Walk the river path for the full spectacle.</p>
@@ -2561,6 +2572,9 @@
     { src: '416657903.jpg',     caption: 'Welcome touches' },
     { src: '413188799.jpg',     caption: 'Bathroom' },
     { src: 'moorland.jpg',      caption: 'Private garden' },
+    { src: '416725441.jpg',     caption: 'Sitting room & log burning stove' },
+    { src: '416656974.jpg',     caption: 'Bedroom' },
+    { src: 'aysgarth-falls.jpg', caption: 'Aysgarth Falls, a short drive away' },
   ];
   let lbIndex = 0;
 
@@ -2759,6 +2773,32 @@
         // video stays hidden, hero background image shows permanently
       }, 2000);
     });
+  })();
+
+  // ─── AYSGARTH FALLS CLIP: load and play only while on screen ─────
+  (function() {
+    const clip = document.getElementById('fallsClip');
+    if (!clip) return;
+    const conn = navigator.connection || {};
+    const slow = conn.saveData || /(^|-)(2g|3g)$/.test(conn.effectiveType || '');
+    const lessMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (slow || lessMotion || !('IntersectionObserver' in window)) return;
+    let loaded = false;
+    new IntersectionObserver((entries) => {
+      entries.forEach((e) => {
+        if (e.isIntersecting) {
+          if (!loaded) {
+            const src = clip.querySelector('source[data-src]');
+            src.src = src.dataset.src;
+            clip.load();
+            loaded = true;
+          }
+          clip.play().catch(() => { /* autoplay refused: the poster stays */ });
+        } else if (loaded) {
+          clip.pause();
+        }
+      });
+    }, { rootMargin: '200px 0px' }).observe(clip);
   })();
 
   // ─── FLOATING BOOK NOW BUTTON ───────────────────────────────────
