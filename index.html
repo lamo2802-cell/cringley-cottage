@@ -671,6 +671,12 @@
     cursor: default;
     background: none;
   }
+  /* Bookings not loaded yet: nothing is offered as free until we know. */
+  .cal-day.loading {
+    color: rgba(122,112,96,0.35);
+    cursor: progress;
+    background: none;
+  }
   .cal-day.available {
     background: var(--white);
     color: var(--ink);
@@ -1612,8 +1618,11 @@
 
   // ─── AVAILABILITY (Supabase) ─────────────────────────────────────
   let bookedRanges = [];
+  // Until the bookings have loaded, the calendar must not show any date as
+  // free (a new visitor once saw a whole month open while it was loading).
+  let availabilityReady = false;
 
-  async function syncCalendar() {
+  async function syncCalendar(attempt = 1) {
     const statusEl = document.getElementById('icalStatus');
     try {
       const ctrl = new AbortController();
@@ -1636,11 +1645,17 @@
         return { start: s, end: e };
       }).filter(r => r.end >= r.start);
       bookedRanges = ranges;
+      availabilityReady = true;
       buildCal();
       if (statusEl) statusEl.textContent = 'Availability up to date ✓';
     } catch(e) {
       // Without the bookings every date would look free, so say so rather
       // than show a calendar that can't be trusted.
+      if (attempt < 3) {
+        if (statusEl) statusEl.textContent = 'Still checking availability…';
+        await new Promise(r => setTimeout(r, 1500));
+        return syncCalendar(attempt + 1);
+      }
       if (statusEl) statusEl.textContent = "Couldn't load availability. Please refresh the page to try again.";
     }
   }
@@ -1919,7 +1934,10 @@
       const turnIn  = !fullyBooked && isCheckoutOnly(viewYear, viewMonth, d);
       const turnOut = !fullyBooked && isTurnoverOut(viewYear, viewMonth, d);
 
-      if (fullyBooked || (turnIn && turnOut)) {
+      if (!availabilityReady) {
+        el.classList.add(past ? 'past' : 'loading');
+        if (!past) el.title = 'Checking availability…';
+      } else if (fullyBooked || (turnIn && turnOut)) {
         // Both halves taken (one guest leaves, another arrives) = no gap at all
         el.classList.add('booked');
       } else if (past || soon) {
@@ -1981,7 +1999,7 @@
         anyTurnover = true;
       }
 
-      if (!past && !soon && !fullyBooked && priced) {
+      if (availabilityReady && !past && !soon && !fullyBooked && priced) {
         const dl = dealForNight(toLocalISODate(thisDate));
         if (dl) {
           el.classList.add('deal');
@@ -2852,11 +2870,16 @@
   const _statusEl = document.getElementById('icalStatus');
   if (_statusEl) _statusEl.textContent = 'Loading availability…';
   (async () => {
-    try { await Promise.all([loadRatesFromSheet(), loadBookingSettings(), releaseCancelledPayment(), loadDeals()]); } catch(e) {}
+    // Bookings load alongside the rest rather than after it, so a slow
+    // rates or deals request can't keep the calendar waiting.
+    // (A hold released after a cancelled payment must be let go first, or
+    // those dates would come back as booked.)
+    const bookingsLoaded = releaseCancelledPayment().catch(() => {}).then(() => syncCalendar());
+    try { await Promise.all([loadRatesFromSheet(), loadBookingSettings(), loadDeals()]); } catch(e) {}
     showFromPrice();
     showDeals();
     buildCal();
-    await syncCalendar();
+    await bookingsLoaded;
   })();
 
   // ─── PWA — SERVICE WORKER ───────────────────────────────────────
