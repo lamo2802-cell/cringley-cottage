@@ -13,6 +13,12 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
 // Only ever emails direct bookings with a guest email on file — Airbnb and
 // Booking.com bookings arrive via iCal with no guest contact info, so they
 // are naturally excluded.
+//
+// It also sends the owners one "today at the cottage" email each morning
+// (OWNER_DIGEST_TIME, UK) when anyone is checking in or out that day, or is
+// due to arrive in ARRIVAL_HEADS_UP_DAYS days. That one covers every
+// booking, including Airbnb and Booking.com ones. Nothing happening means no
+// email. email_log is the record of whether today's has gone.
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -22,10 +28,21 @@ const FROM_EMAIL = "Cringley Cottage <hello@cringleycottage.com>";
 const SITE_BASE_URL = "https://www.cringleycottage.com/";
 const OWNER_EMAILS = ["lamo2802@gmail.com", "rpeacey987@gmail.com"];
 const REVIEW_LINK_DAYS = 60;
+const DIGEST_EMAILS = ["lamo2802@gmail.com"];
+const OWNER_DIGEST_TIME = "07:30";
+const ARRIVAL_HEADS_UP_DAYS = 3;
+const DIGEST_SUBJECT_PREFIX = "At the cottage";
+const SOURCE_LABELS: Record<string, string> = { direct: "Direct booking", airbnb: "Airbnb", booking_com: "Booking.com" };
 
 function money(n: number): string { return "£" + Number(n).toFixed(2).replace(/\.00$/, ""); }
 function fmtDate(d: string): string {
   return new Date(d + "T00:00:00").toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
+}
+function fmtDay(d: string): string {
+  return new Date(d + "T12:00:00Z").toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", timeZone: "UTC" });
+}
+function nightsBetween(a: string, b: string): number {
+  return Math.round((Date.parse(b + "T12:00:00Z") - Date.parse(a + "T12:00:00Z")) / 86400000);
 }
 
 function emailShell(bodyHtml: string): string {
@@ -133,6 +150,111 @@ function addDays(dateStr: string, n: number): string {
   return d.toISOString().slice(0, 10);
 }
 
+type DigestBooking = {
+  id: string; source: string; booking_ref: string | null; checkin: string; checkout: string;
+  guest_first_name: string | null; guest_last_name: string | null; guest_phone: string | null;
+  guests_count: number | null; children_count: number | null; has_dog: boolean | null;
+  total_amount: number | null; amount_paid: number | null; message: string | null;
+};
+
+function bookingRows(b: DigestBooking, todayUK: string): string {
+  const nights = nightsBetween(b.checkin, b.checkout);
+  let rows = infoRow("Booked through", SOURCE_LABELS[b.source] || escapeHtml(b.source));
+  if (b.source === "direct") {
+    const name = `${escapeHtml(b.guest_first_name)} ${escapeHtml(b.guest_last_name)}`.trim();
+    const party = [
+      b.guests_count ? `${b.guests_count} adult${b.guests_count === 1 ? "" : "s"}` : "",
+      b.children_count ? `${b.children_count} child${b.children_count === 1 ? "" : "ren"}` : "",
+      b.has_dog ? "a dog" : "",
+    ].filter(Boolean).join(", ");
+    const outstanding = Math.max(0, Math.round(((b.total_amount || 0) - (b.amount_paid || 0)) * 100) / 100);
+    rows += infoRow("Guest", name || "—", true);
+    if (b.booking_ref) rows += infoRow("Booking reference", escapeHtml(b.booking_ref));
+    if (party) rows += infoRow("Party", party);
+    if (b.guest_phone) rows += infoRow("Phone", escapeHtml(b.guest_phone));
+    if (b.checkout > todayUK) rows += infoRow("Payment", outstanding > 0 ? `${money(outstanding)} still to pay` : "Paid in full");
+    if (b.message) rows += infoRow("Their note", escapeHtml(b.message));
+  } else {
+    rows += infoRow("Guest", `See the ${SOURCE_LABELS[b.source] || b.source} app`);
+  }
+  rows += infoRow("Stay", `${fmtDay(b.checkin)} to ${fmtDay(b.checkout)} (${nights} night${nights === 1 ? "" : "s"})`);
+  return rows;
+}
+
+function subHeading(text: string): string {
+  return `<h2 style="font-family:Georgia,serif;font-size:17px;font-weight:600;color:#232120;margin:22px 0 8px;">${text}</h2>`;
+}
+
+// Once a day, from OWNER_DIGEST_TIME. Returns true when an email was sent.
+// Stops for the day once one has gone, or after 3 failed tries.
+// deno-lint-ignore no-explicit-any
+async function sendOwnerDigest(supabase: any, todayUK: string): Promise<boolean> {
+  const { data: earlier } = await supabase
+    .from("email_log").select("ok")
+    .eq("function_name", "send-guest-messages")
+    .like("subject", `${DIGEST_SUBJECT_PREFIX}%${fmtDay(todayUK)}%`)
+    .gte("created_at", new Date(Date.now() - 20 * 3600 * 1000).toISOString());
+  if ((earlier || []).some((r: { ok: boolean }) => r.ok) || (earlier || []).length >= 3) return false;
+
+  const headsUpDay = addDays(todayUK, ARRIVAL_HEADS_UP_DAYS);
+  const { data, error } = await supabase
+    .from("bookings")
+    .select("id, source, booking_ref, checkin, checkout, guest_first_name, guest_last_name, guest_phone, guests_count, children_count, has_dog, total_amount, amount_paid, message")
+    .eq("is_blocked", false).eq("status", "confirmed")
+    .or(`checkin.eq.${todayUK},checkout.eq.${todayUK},checkin.eq.${headsUpDay}`)
+    .order("checkin");
+  if (error) throw new Error(`digest query: ${error.message}`);
+  const all = (data || []) as DigestBooking[];
+  const arriving = all.filter(b => b.checkin === todayUK);
+  const leaving = all.filter(b => b.checkout === todayUK);
+  const upcoming = all.filter(b => b.checkin === headsUpDay);
+  if (!arriving.length && !leaving.length && !upcoming.length) return false;
+
+  // For a departure, say when the next guests arrive so the clean can be planned.
+  let nextArrival: DigestBooking | null = null;
+  if (leaving.length && !arriving.length) {
+    const { data: next } = await supabase
+      .from("bookings")
+      .select("id, source, booking_ref, checkin, checkout, guest_first_name, guest_last_name, guest_phone, guests_count, children_count, has_dog, total_amount, amount_paid, message")
+      .eq("is_blocked", false).eq("status", "confirmed")
+      .gt("checkin", todayUK).order("checkin").limit(1);
+    nextArrival = ((next || []) as DigestBooking[])[0] || null;
+  }
+
+  const summary: string[] = [];
+  if (leaving.length) summary.push(`${leaving.length === 1 ? "a guest" : `${leaving.length} bookings`} checking out`);
+  if (arriving.length) summary.push(`${arriving.length === 1 ? "a guest" : `${arriving.length} bookings`} checking in`);
+  if (upcoming.length) summary.push(`guests arriving in ${ARRIVAL_HEADS_UP_DAYS} days`);
+
+  let body = heading(`Today at Cringley Cottage`) +
+    para(`${fmtDay(todayUK)}: ${summary.join(", ")}.`);
+  if (leaving.length && arriving.length) {
+    body += para(`<strong>Same-day changeover.</strong> Check-out is by 10am and the next guests can arrive from 3pm.`);
+  }
+  for (const b of leaving) {
+    body += subHeading("Checking out today (by 10am)") + infoBox(bookingRows(b, todayUK));
+  }
+  if (leaving.length && !arriving.length) {
+    body += para(nextArrival
+      ? `Next guests arrive ${fmtDay(nextArrival.checkin)} (${SOURCE_LABELS[nextArrival.source] || escapeHtml(nextArrival.source)}).`
+      : "No further bookings are on the calendar yet.");
+  }
+  for (const b of arriving) {
+    body += subHeading("Checking in today (from 3pm)") + infoBox(bookingRows(b, todayUK));
+  }
+  for (const b of upcoming) {
+    body += subHeading(`Arriving ${fmtDay(b.checkin)}`) + infoBox(bookingRows(b, todayUK));
+  }
+  body += button("Open bookings", `${SITE_BASE_URL}admin.html`);
+
+  const subjectBits: string[] = [];
+  if (leaving.length) subjectBits.push("check-out");
+  if (arriving.length) subjectBits.push("check-in");
+  if (upcoming.length) subjectBits.push(`arrival ${fmtDay(headsUpDay).split(" ")[0]}`);
+  const subject = `${DIGEST_SUBJECT_PREFIX}, ${fmtDay(todayUK)}: ${subjectBits.join(", ")}`;
+  return await sendEmail(DIGEST_EMAILS, subject, emailShell(body));
+}
+
 Deno.serve(async (req: Request) => {
   if (SYNC_SECRET) {
     const provided = req.headers.get("x-sync-secret");
@@ -159,7 +281,16 @@ Deno.serve(async (req: Request) => {
     const checkinText = settings?.checkin_email_text || "";
     const checkoutText = settings?.checkout_email_text || "";
 
-    let checkinSent = 0, checkoutSent = 0, reviewSent = 0, unpaidHeld = 0;
+    let checkinSent = 0, checkoutSent = 0, reviewSent = 0, unpaidHeld = 0, ownerDigestSent = false;
+
+    // Runs first and on its own, so a problem here never stops guest emails.
+    if (nowUK >= OWNER_DIGEST_TIME) {
+      try {
+        ownerDigestSent = await sendOwnerDigest(supabase, todayUK);
+      } catch (e) {
+        console.error("owner digest failed", e);
+      }
+    }
 
     if (nowUK >= checkinTime) {
       const { data: arriving } = await supabase
@@ -297,7 +428,7 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    return new Response(JSON.stringify({ ok: true, checkinSent, checkoutSent, reviewSent, unpaidHeld, todayUK, nowUK }), { headers: { "Content-Type": "application/json" } });
+    return new Response(JSON.stringify({ ok: true, checkinSent, checkoutSent, reviewSent, unpaidHeld, ownerDigestSent, todayUK, nowUK }), { headers: { "Content-Type": "application/json" } });
   } catch (e) {
     return new Response(JSON.stringify({ ok: false, error: String(e) }), { status: 500, headers: { "Content-Type": "application/json" } });
   }
