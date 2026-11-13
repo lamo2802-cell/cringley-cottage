@@ -150,11 +150,21 @@ function addDays(dateStr: string, n: number): string {
   return d.toISOString().slice(0, 10);
 }
 
+// Private link to the guest register page (guest-register.html). Same
+// signing as in stripe-webhook and the guest-register function.
+async function guestRegisterUrl(bookingId: string): Promise<string> {
+  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(SERVICE_ROLE_KEY), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  const sig = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(`guest-register:${bookingId}`));
+  const hex = Array.from(new Uint8Array(sig)).map(b => b.toString(16).padStart(2, "0")).join("").slice(0, 32);
+  return `${SITE_BASE_URL}guest-register.html?t=${bookingId}.${hex}`;
+}
+
 type DigestBooking = {
   id: string; source: string; booking_ref: string | null; checkin: string; checkout: string;
   guest_first_name: string | null; guest_last_name: string | null; guest_phone: string | null;
   guests_count: number | null; children_count: number | null; has_dog: boolean | null;
   total_amount: number | null; amount_paid: number | null; message: string | null;
+  guest_register_saved_at: string | null;
 };
 
 function bookingRows(b: DigestBooking, todayUK: string): string {
@@ -173,6 +183,7 @@ function bookingRows(b: DigestBooking, todayUK: string): string {
     if (party) rows += infoRow("Party", party);
     if (b.guest_phone) rows += infoRow("Phone", escapeHtml(b.guest_phone));
     if (b.checkout > todayUK) rows += infoRow("Payment", outstanding > 0 ? `${money(outstanding)} still to pay` : "Paid in full");
+    if (b.checkout >= todayUK) rows += infoRow("Guest register", b.guest_register_saved_at ? "Filled in" : "Not filled in yet");
     if (b.message) rows += infoRow("Their note", escapeHtml(b.message));
   } else {
     rows += infoRow("Guest", `See the ${SOURCE_LABELS[b.source] || b.source} app`);
@@ -199,7 +210,7 @@ async function sendOwnerDigest(supabase: any, todayUK: string): Promise<boolean>
   const headsUpDay = addDays(todayUK, ARRIVAL_HEADS_UP_DAYS);
   const { data, error } = await supabase
     .from("bookings")
-    .select("id, source, booking_ref, checkin, checkout, guest_first_name, guest_last_name, guest_phone, guests_count, children_count, has_dog, total_amount, amount_paid, message")
+    .select("id, source, booking_ref, checkin, checkout, guest_first_name, guest_last_name, guest_phone, guests_count, children_count, has_dog, total_amount, amount_paid, message, guest_register_saved_at")
     .eq("is_blocked", false).eq("status", "confirmed")
     .or(`checkin.eq.${todayUK},checkout.eq.${todayUK},checkin.eq.${headsUpDay}`)
     .order("checkin");
@@ -215,7 +226,7 @@ async function sendOwnerDigest(supabase: any, todayUK: string): Promise<boolean>
   if (leaving.length && !arriving.length) {
     const { data: next } = await supabase
       .from("bookings")
-      .select("id, source, booking_ref, checkin, checkout, guest_first_name, guest_last_name, guest_phone, guests_count, children_count, has_dog, total_amount, amount_paid, message")
+      .select("id, source, booking_ref, checkin, checkout, guest_first_name, guest_last_name, guest_phone, guests_count, children_count, has_dog, total_amount, amount_paid, message, guest_register_saved_at")
       .eq("is_blocked", false).eq("status", "confirmed")
       .gt("checkin", todayUK).order("checkin").limit(1);
     nextArrival = ((next || []) as DigestBooking[])[0] || null;
@@ -295,7 +306,7 @@ Deno.serve(async (req: Request) => {
     if (nowUK >= checkinTime) {
       const { data: arriving } = await supabase
         .from("bookings")
-        .select("id, booking_ref, guest_first_name, guest_last_name, guest_email, guest_phone, checkin, checkout, total_amount, amount_paid, unpaid_arrival_alert_sent_at")
+        .select("id, booking_ref, guest_first_name, guest_last_name, guest_email, guest_phone, checkin, checkout, total_amount, amount_paid, unpaid_arrival_alert_sent_at, guest_register_saved_at")
         .eq("source", "direct").eq("is_blocked", false).eq("status", "confirmed")
         .eq("checkin", todayUK).is("checkin_email_sent_at", null)
         .not("guest_email", "is", null);
@@ -347,6 +358,9 @@ Deno.serve(async (req: Request) => {
             infoRow("Parking", "On-street in the village, or Parkins Garth car park at the village entrance")
           ) +
           freeTextToHtml(checkinText) +
+          (b.guest_register_saved_at ? "" :
+            para("<strong>One quick thing:</strong> UK law asks us to keep a short register of guests aged 16 or over. Please add your party's names and nationalities before you arrive. It takes a minute.") +
+            button("Register your guests", await guestRegisterUrl(b.id))) +
           button("View guest information", `${SITE_BASE_URL}guest-info.html`)
         );
         const sent = await sendEmail(b.guest_email, `Check-in Today — Cringley Cottage`, html, b.id);

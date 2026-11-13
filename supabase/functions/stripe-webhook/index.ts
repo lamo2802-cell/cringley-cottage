@@ -111,6 +111,14 @@ function stayDetailsBox(): string {
     infoRow("Parking", "On-street in the village, or Parkins Garth car park at the village entrance")
   );
 }
+// Private link to the guest register page (guest-register.html): the
+// booking id plus an HMAC of it, checked by the guest-register function.
+async function guestRegisterUrl(bookingId: string): Promise<string> {
+  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(SERVICE_ROLE_KEY), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  const sig = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(`guest-register:${bookingId}`));
+  const hex = Array.from(new Uint8Array(sig)).map(b => b.toString(16).padStart(2, "0")).join("").slice(0, 32);
+  return `${SITE_BASE_URL}guest-register.html?t=${bookingId}.${hex}`;
+}
 function nightsBetween(checkin: string, checkout: string): number {
   return Math.round((new Date(checkout + "T00:00:00").getTime() - new Date(checkin + "T00:00:00").getTime()) / 86400000);
 }
@@ -323,7 +331,10 @@ Deno.serve(async (req: Request) => {
         (outstanding > 0
           ? para(`You can pay the remaining balance any time before ${fmtDate(booking.balance_due_date)}. We'll send you a reminder about a week before.`) +
             button("Pay your balance", manageUrl)
-          : para("Your stay is paid in full — nothing more to do!")) +
+          : para("Your stay is paid in full!")) +
+        `<h2 style="font-family:Georgia,serif;font-size:17px;font-weight:600;color:#232120;margin:26px 0 8px;">One quick thing before you arrive</h2>` +
+        para("UK law asks us to keep a short register of guests aged 16 or over. Please add the names and nationalities of everyone in your party who is 16 or over. British, Irish and Commonwealth citizens only need their name and nationality. Other guests also give their passport number and where they're heading next. It takes a minute, and you can change it up until you leave.") +
+        button("Register your guests", await guestRegisterUrl(bookingId)) +
         stayDetailsBox() +
         para(`Your booking is made under our <a href="${TERMS_URL}" style="color:#5e7a52;">booking terms</a>, including the cancellation policy. We'll email your key-safe code on the morning you arrive.`) +
         para("We look forward to welcoming you to Cringley Cottage!") +

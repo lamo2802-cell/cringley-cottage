@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>Guest Register — Cringley Cottage</title>
+<script>
+  // Same early check as the other owner pages: send a signed-out (or staff)
+  // visitor onward before any of the page is shown.
+  (function () {
+    var session = null;
+    try { session = JSON.parse(localStorage.getItem('cc_session')); } catch (e) {}
+    if (!session || !session.access_token) {
+      window.location.replace('login.html');
+    } else if (session.role !== 'owner') {
+      window.location.replace('staff-checklist.html');
+    } else {
+      document.documentElement.classList.add('auth-pending');
+    }
+  })();
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --ink: #232120; --cream: #f3ede3; --stone: #dfd8cb;
+    --sage: #5e7a52; --sage-light: #84a472; --muted: #7a6f60;
+  }
+  html.auth-pending body { visibility: hidden; }
+  body { font-family: 'DM Sans', sans-serif; background: var(--stone); color: var(--ink); min-height: 100vh; }
+  header {
+    background: var(--ink); color: var(--cream); padding: 1.2rem 6%;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  header h1 { font-family: 'Cormorant Garamond', serif; font-weight: 600; font-size: 1.4rem; }
+  header a, header button {
+    background: none; border: 1px solid rgba(247,242,234,0.25); color: var(--cream);
+    font-family: 'DM Sans', sans-serif; font-size: 0.78rem; letter-spacing: 0.05em;
+    padding: 0.5rem 1rem; border-radius: 2px; cursor: pointer; text-decoration: none; margin-left: 0.6rem;
+  }
+  header a:hover, header button:hover { border-color: var(--sage-light); color: var(--sage-light); }
+  main { max-width: 960px; margin: 0 auto; padding: 2.5rem 6%; }
+  p.sub { color: var(--muted); font-size: 0.88rem; margin-bottom: 1.4rem; }
+  .toolbar { display: flex; gap: 0.8rem; flex-wrap: wrap; align-items: center; margin-bottom: 1.2rem; }
+  .toolbar .grow { flex: 1; }
+  select, input[type=text] { border: 1px solid rgba(0,0,0,0.15); border-radius: 2px; padding: 0.5rem 0.6rem; font-family: 'DM Sans', sans-serif; font-size: 0.85rem; background: #fff; width: 100%; }
+  .toolbar select { width: auto; }
+  .btn { background: var(--sage); color: var(--cream); border: none; padding: 0.55rem 1.1rem; border-radius: 2px; cursor: pointer; font-size: 0.8rem; font-family: 'DM Sans', sans-serif; }
+  .btn.ghost { background: none; border: 1px solid var(--sage); color: var(--sage); }
+  .btn.plain { background: none; color: var(--muted); text-decoration: underline; padding: 0.55rem 0.4rem; }
+  .stay { background: #fff; border-radius: 4px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); padding: 1.1rem 1.3rem; margin-bottom: 1rem; }
+  .stay-head { display: flex; gap: 1rem; align-items: baseline; flex-wrap: wrap; margin-bottom: 0.6rem; }
+  .stay-head strong { font-size: 0.95rem; }
+  .stay-head .when { color: var(--muted); font-size: 0.85rem; flex: 1; }
+  .pill { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.06em; padding: 0.2rem 0.55rem; border-radius: 2px; white-space: nowrap; }
+  .pill.ok { background: rgba(94,122,82,0.12); color: var(--sage); }
+  .pill.todo { background: #fbf4e3; color: #8a6a1f; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { text-align: left; padding: 0.45rem 0.5rem; font-size: 0.83rem; border-top: 1px solid rgba(0,0,0,0.06); vertical-align: top; }
+  th { font-size: 0.66rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); font-weight: 500; }
+  .empty { color: var(--muted); font-size: 0.85rem; }
+  .edit-row { display: grid; grid-template-columns: 1.3fr 1fr 1fr 1fr 1.4fr auto; gap: 0.5rem; margin-bottom: 0.5rem; align-items: start; }
+  .edit-row .idf[disabled] { background: #f4f1ec; }
+  .msg { font-size: 0.85rem; padding: 0.7rem 0.9rem; border-radius: 2px; margin-bottom: 1rem; }
+  .msg.err { background: rgba(180,80,60,0.1); border: 1px solid rgba(180,80,60,0.3); color: #7d3424; }
+  .msg.ok { background: rgba(94,122,82,0.1); border: 1px solid rgba(94,122,82,0.3); }
+  [hidden] { display: none !important; }
+  @media (max-width: 800px) {
+    header { flex-wrap: wrap; gap: 0.8rem; }
+    header > div { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+    header a, header button { margin-left: 0; }
+    table, thead, tbody, th, td, tr { display: block; }
+    thead { display: none; }
+    tr { padding: 0.5rem 0; border-top: 1px solid rgba(0,0,0,0.08); }
+    td { border: none; padding: 0.15rem 0; }
+    td::before { content: attr(data-label); display: block; font-size: 0.62rem; text-transform: uppercase; color: var(--muted); }
+    .edit-row { grid-template-columns: 1fr; padding-bottom: 0.8rem; border-bottom: 1px solid rgba(0,0,0,0.08); }
+  }
+</style>
+</head>
+<body>
+  <header>
+    <h1>Cringley Cottage — Guest Register</h1>
+    <div>
+      <a href="admin.html">Back to Admin</a>
+      <button id="logoutBtn">Log Out</button>
+    </div>
+  </header>
+  <main>
+    <p class="sub" style="margin-top:0;">The register UK law asks us to keep (Immigration (Hotel Records) Order 1972): every guest aged 16 or over gives their name and nationality, and anyone who isn't British, Irish or a Commonwealth citizen also gives their passport or ID number, where it was issued, and where they're going next. Direct guests fill it in through the link in their booking confirmation email, with a reminder in the check-in day email if it's missing. Each stay's details are deleted automatically 12 months after checkout. If the police ask to see it, use "Download CSV".</p>
+    <div id="pageMsg" class="msg" hidden></div>
+    <div class="toolbar">
+      <select id="rangeSel">
+        <option value="upcoming" selected>Upcoming and current stays</option>
+        <option value="past">Past stays (last 12 months)</option>
+        <option value="all">Everything held</option>
+      </select>
+      <span class="grow"></span>
+      <button class="btn ghost" id="csvBtn" type="button">Download CSV</button>
+    </div>
+    <div id="list"><p class="empty">Loading…</p></div>
+  </main>
+  <script>
+    const SUPABASE_URL = 'https://yfeyswuxhgezkpcjhznp.supabase.co';
+    const SUPABASE_ANON_KEY = 'sb_publishable_96mc6z7EpkjnKPsMX0z5Ug_BJ7MDBNp';
+
+    // British, Irish and Commonwealth citizens (British Nationality Act 1981,
+    // Schedule 3) don't give ID details. Keep in step with the list in the
+    // guest-register function.
+    const EXEMPT = new Set([
+      'British', 'Irish',
+      'Antigua and Barbuda', 'Australia', 'Bahamas', 'Bangladesh', 'Barbados', 'Belize', 'Botswana', 'Brunei',
+      'Cameroon', 'Canada', 'Cyprus', 'Dominica', 'Eswatini', 'Fiji', 'Gabon', 'Gambia', 'Ghana', 'Grenada',
+      'Guyana', 'India', 'Jamaica', 'Kenya', 'Kiribati', 'Lesotho', 'Malawi', 'Malaysia', 'Maldives', 'Malta',
+      'Mauritius', 'Mozambique', 'Namibia', 'Nauru', 'New Zealand', 'Nigeria', 'Pakistan', 'Papua New Guinea',
+      'Rwanda', 'Saint Kitts and Nevis', 'Saint Lucia', 'Saint Vincent and the Grenadines', 'Samoa', 'Seychelles',
+      'Sierra Leone', 'Singapore', 'Solomon Islands', 'South Africa', 'Sri Lanka', 'Tanzania', 'Togo', 'Tonga',
+      'Trinidad and Tobago', 'Tuvalu', 'Uganda', 'Vanuatu', 'Zambia', 'Zimbabwe',
+    ]);
+
+    function escapeHtml(s) {
+      return (s ?? '').toString()
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    }
+    function getSession() {
+      try { return JSON.parse(localStorage.getItem('cc_session')); } catch { return null; }
+    }
+    function clearSession() { localStorage.removeItem('cc_session'); }
+    let session = getSession();
+    if (!session) window.location.href = 'login.html';
+    else if (session.role !== 'owner') window.location.href = 'staff-checklist.html';
+    function sessionAal(token) {
+      try { return JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))).aal; } catch { return null; }
+    }
+    async function refreshSession() {
+      const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=refresh_token`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY },
+        body: JSON.stringify({ refresh_token: session.refresh_token }),
+      });
+      if (!res.ok) { clearSession(); window.location.href = 'login.html'; return null; }
+      const data = await res.json();
+      const role = data.user?.app_metadata?.role || session.role || null;
+      session = { access_token: data.access_token, refresh_token: data.refresh_token, expires_at: Date.now() + data.expires_in * 1000, role, user_id: data.user?.id || session.user_id || null };
+      localStorage.setItem('cc_session', JSON.stringify(session));
+      return session;
+    }
+    async function authFetch(path, options = {}) {
+      if (!session.access_token || Date.now() > session.expires_at - 60000) {
+        await refreshSession();
+        if (!session) return null;
+      }
+      const res = await fetch(`${SUPABASE_URL}${path}`, {
+        ...options,
+        headers: {
+          'apikey': SUPABASE_ANON_KEY,
+          'Authorization': `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
+          ...(options.headers || {}),
+        },
+      });
+      if (res.status === 401) {
+        const refreshed = await refreshSession();
+        if (!refreshed) return null;
+        return authFetch(path, options);
+      }
+      return res;
+    }
+    document.getElementById('logoutBtn').addEventListener('click', () => { clearSession(); window.location.href = 'login.html'; });
+
+    function ukDateStr(d = new Date()) { return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/London' }).format(d); }
+    function niceDate(d) { return new Date(d + 'T12:00:00Z').toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }); }
+    function showPageMsg(text, ok) {
+      const el = document.getElementById('pageMsg');
+      el.textContent = text; el.className = 'msg ' + (ok ? 'ok' : 'err'); el.hidden = false;
+      if (ok) setTimeout(() => { el.hidden = true; }, 4000);
+    }
+
+    let stays = [];   // bookings with their register rows
+
+    async function load() {
+      const range = document.getElementById('rangeSel').value;
+      const today = ukDateStr();
+      let filter = '';
+      if (range === 'upcoming') filter = `&checkout=gte.${today}`;
+      if (range === 'past') filter = `&checkout=lt.${today}`;
+      const order = range === 'upcoming' ? 'checkin.asc' : 'checkin.desc';
+      const res = await authFetch(`/rest/v1/bookings?select=id,booking_ref,guest_first_name,guest_last_name,guest_email,checkin,checkout,guests_count,children_count,guest_register_saved_at,guest_register(position,full_name,nationality,id_required,id_document_number,id_document_issued_at,next_destination)&source=eq.direct&is_blocked=eq.false&status=eq.confirmed${filter}&order=${order}&guest_register.order=position.asc&limit=500`);
+      const list = document.getElementById('list');
+      if (!res || !res.ok) { list.innerHTML = '<p class="empty">Could not load the guest register.</p>'; return; }
+      stays = await res.json();
+      // "Everything held" and "past" only mean stays that still have details.
+      if (range !== 'upcoming') stays = stays.filter(s => (s.guest_register || []).length);
+      render();
+    }
+
+    function render() {
+      const list = document.getElementById('list');
+      if (!stays.length) { list.innerHTML = '<p class="empty">Nothing to show here.</p>'; return; }
+      list.innerHTML = stays.map((s, si) => {
+        const rows = s.guest_register || [];
+        const name = [s.guest_first_name, s.guest_last_name].filter(Boolean).join(' ');
+        const pill = s.guest_register_saved_at ? '<span class="pill ok">Filled in</span>' : '<span class="pill todo">Not filled in yet</span>';
+        const table = rows.length ? `
+          <table>
+            <thead><tr><th>Name</th><th>Nationality</th><th>Passport / ID no.</th><th>Issued in</th><th>Going on to</th></tr></thead>
+            <tbody>${rows.map(r => `
+              <tr>
+                <td data-label="Name">${escapeHtml(r.full_name)}</td>
+                <td data-label="Nationality">${escapeHtml(r.nationality)}</td>
+                <td data-label="Passport / ID no.">${r.id_required ? escapeHtml(r.id_document_number) : '<span class="empty">Not needed</span>'}</td>
+                <td data-label="Issued in">${r.id_required ? escapeHtml(r.id_document_issued_at) : ''}</td>
+                <td data-label="Going on to">${r.id_required ? escapeHtml(r.next_destination) : ''}</td>
+              </tr>`).join('')}</tbody>
+          </table>` : '<p class="empty">No details yet.</p>';
+        return `
+          <div class="stay" data-si="${si}">
+            <div class="stay-head">
+              <strong>${escapeHtml(s.booking_ref || 'No ref')}</strong>
+              <span>${escapeHtml(name)}</span>
+              <span class="when">${escapeHtml(niceDate(s.checkin))} to ${escapeHtml(niceDate(s.checkout))} · ${s.guests_count || '?'} guest${s.guests_count === 1 ? '' : 's'}</span>
+              ${pill}
+              <button class="btn plain editBtn" type="button">Edit</button>
+            </div>
+            <div class="view">${table}</div>
+            <div class="editor" hidden></div>
+          </div>`;
+      }).join('');
+    }
+
+    // ─── Editing by hand (e.g. a guest gives their details at the door) ───
+    function editRowHtml(r) {
+      const needs = r.nationality && !EXEMPT.has(r.nationality);
+      return `
+        <div class="edit-row">
+          <input type="text" class="e-name" placeholder="Full name" maxlength="100" value="${escapeHtml(r.full_name)}">
+          <input type="text" class="e-nat" placeholder="Nationality" maxlength="60" list="natList" value="${escapeHtml(r.nationality)}">
+          <input type="text" class="e-id idf" placeholder="Passport / ID no." maxlength="30" value="${escapeHtml(r.id_document_number)}" ${needs ? '' : 'disabled'}>
+          <input type="text" class="e-issued idf" placeholder="Issued in" maxlength="60" value="${escapeHtml(r.id_document_issued_at)}" ${needs ? '' : 'disabled'}>
+          <input type="text" class="e-next idf" placeholder="Going on to" maxlength="200" value="${escapeHtml(r.next_destination)}" ${needs ? '' : 'disabled'}>
+          <button class="btn plain e-remove" type="button">Remove</button>
+        </div>`;
+    }
+    function openEditor(card) {
+      const s = stays[Number(card.dataset.si)];
+      const rows = (s.guest_register || []).length ? s.guest_register : [{ full_name: [s.guest_first_name, s.guest_last_name].filter(Boolean).join(' '), nationality: '' }];
+      const ed = card.querySelector('.editor');
+      ed.innerHTML = `
+        <div class="e-rows">${rows.map(editRowHtml).join('')}</div>
+        <p class="empty" style="margin:0.3rem 0 0.8rem;">Nationality: type "British", "Irish" or a country name. ID details are only asked for when the nationality isn't British, Irish or Commonwealth.</p>
+        <div class="toolbar" style="margin-bottom:0;">
+          <button class="btn ghost e-add" type="button">Add a guest</button>
+          <span class="grow"></span>
+          <button class="btn plain e-cancel" type="button">Cancel</button>
+          <button class="btn e-save" type="button">Save</button>
+        </div>`;
+      ed.hidden = false;
+      card.querySelector('.view').hidden = true;
+    }
+    function closeEditor(card) {
+      card.querySelector('.editor').hidden = true;
+      card.querySelector('.view').hidden = false;
+    }
+    async function saveEditor(card) {
+      const s = stays[Number(card.dataset.si)];
+      const rows = [...card.querySelectorAll('.edit-row')].map((el, i) => {
+        const nationality = el.querySelector('.e-nat').value.trim();
+        const idRequired = !EXEMPT.has(nationality);
+        return {
+          booking_id: s.id, position: i + 1,
+          full_name: el.querySelector('.e-name').value.trim(),
+          nationality, id_required: idRequired,
+          id_document_number: idRequired ? el.querySelector('.e-id').value.replace(/\s+/g, '').toUpperCase() || null : null,
+          id_document_issued_at: idRequired ? el.querySelector('.e-issued').value.trim() || null : null,
+          next_destination: idRequired ? el.querySelector('.e-next').value.trim() || null : null,
+        };
+      });
+      for (const [i, r] of rows.entries()) {
+        if (r.full_name.length < 2 || r.nationality.length < 2) return showPageMsg(`Guest ${i + 1}: enter a name and nationality.`, false);
+        if (r.id_required && (!r.id_document_number || !r.id_document_issued_at || !r.next_destination))
+          return showPageMsg(`Guest ${i + 1}: ${r.nationality} isn't British, Irish or Commonwealth, so the ID number, where it was issued and where they're going next are all needed.`, false);
+      }
+      // Replace the stay's rows. If the insert fails, the old rows go back.
+      const del = await authFetch(`/rest/v1/guest_register?booking_id=eq.${s.id}`, { method: 'DELETE' });
+      if (!del || !del.ok) return showPageMsg('Could not save. Please try again.', false);
+      if (rows.length) {
+        const ins = await authFetch('/rest/v1/guest_register', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(rows) });
+        if (!ins || !ins.ok) {
+          // Put the previous details back.
+          const prev = (s.guest_register || []).map(r => ({ ...r, booking_id: s.id }));
+          if (prev.length) await authFetch('/rest/v1/guest_register', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(prev) });
+          return showPageMsg('Could not save those details. Please check them and try again.', false);
+        }
+      }
+      await authFetch(`/rest/v1/bookings?id=eq.${s.id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ guest_register_saved_at: rows.length ? new Date().toISOString() : null }) });
+      showPageMsg('Saved.', true);
+      load();
+    }
+    document.getElementById('list').addEventListener('click', e => {
+      const card = e.target.closest('.stay'); if (!card) return;
+      if (e.target.closest('.editBtn')) openEditor(card);
+      else if (e.target.closest('.e-cancel')) closeEditor(card);
+      else if (e.target.closest('.e-save')) saveEditor(card);
+      else if (e.target.closest('.e-add')) card.querySelector('.e-rows').insertAdjacentHTML('beforeend', editRowHtml({ full_name: '', nationality: '' }));
+      else if (e.target.closest('.e-remove')) e.target.closest('.edit-row').remove();
+    });
+    document.getElementById('list').addEventListener('input', e => {
+      if (!e.target.classList.contains('e-nat')) return;
+      const row = e.target.closest('.edit-row');
+      const needs = e.target.value.trim() && !EXEMPT.has(e.target.value.trim());
+      row.querySelectorAll('.idf').forEach(i => { i.disabled = !needs; });
+    });
+
+    // ─── CSV for an inspection ───
+    document.getElementById('csvBtn').addEventListener('click', async () => {
+      const res = await authFetch('/rest/v1/guest_register?select=full_name,nationality,id_document_number,id_document_issued_at,next_destination,bookings(booking_ref,checkin,checkout)&order=created_at.asc&limit=5000');
+      if (!res || !res.ok) return showPageMsg('Could not download the register.', false);
+      const rows = (await res.json()).sort((a, z) => (a.bookings?.checkin || '').localeCompare(z.bookings?.checkin || ''));
+      const cell = v => `"${(v ?? '').toString().replace(/"/g, '""')}"`;
+      const lines = [['Arrival date', 'Departure date', 'Booking ref', 'Full name', 'Nationality', 'Passport / ID number', 'Place of issue', 'Next destination'].map(cell).join(',')]
+        .concat(rows.map(r => [r.bookings?.checkin, r.bookings?.checkout, r.bookings?.booking_ref, r.full_name, r.nationality, r.id_document_number, r.id_document_issued_at, r.next_destination].map(cell).join(',')));
+      const blob = new Blob([lines.join('\r\n')], { type: 'text/csv' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `cringley-guest-register-${ukDateStr()}.csv`;
+      a.click();
+      URL.revokeObjectURL(a.href);
+    });
+
+    document.getElementById('rangeSel').addEventListener('change', load);
+
+    // Nationality suggestions for the editor.
+    document.body.insertAdjacentHTML('beforeend', `<datalist id="natList">${[...EXEMPT].map(n => `<option value="${escapeHtml(n)}">`).join('')}</datalist>`);
+
+    (async () => {
+      if (!session) return;
+      if (sessionAal(session.access_token) !== 'aal2') { window.location.replace('admin.html'); return; }
+      if (Date.now() > session.expires_at - 60000 && !(await refreshSession())) return;
+      document.documentElement.classList.remove('auth-pending');
+      load();
+    })();
+  </script>
+</body>
+</html>
