@@ -120,6 +120,13 @@
       'Trinidad and Tobago', 'Tuvalu', 'Uganda', 'Vanuatu', 'Zambia', 'Zimbabwe',
     ]);
 
+    // Matches what's typed to the list's spelling, ignoring case, so
+    // "british" counts as British.
+    function canonicalNat(v) {
+      const t = (v || '').trim();
+      for (const n of EXEMPT) if (n.toLowerCase() === t.toLowerCase()) return n;
+      return t;
+    }
     function escapeHtml(s) {
       return (s ?? '').toString()
         .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -233,7 +240,7 @@
 
     // ─── Editing by hand (e.g. a guest gives their details at the door) ───
     function editRowHtml(r) {
-      const needs = r.nationality && !EXEMPT.has(r.nationality);
+      const needs = r.nationality && !EXEMPT.has(canonicalNat(r.nationality));
       return `
         <div class="edit-row">
           <input type="text" class="e-name" placeholder="Full name" maxlength="100" value="${escapeHtml(r.full_name)}">
@@ -267,7 +274,7 @@
     async function saveEditor(card) {
       const s = stays[Number(card.dataset.si)];
       const rows = [...card.querySelectorAll('.edit-row')].map((el, i) => {
-        const nationality = el.querySelector('.e-nat').value.trim();
+        const nationality = canonicalNat(el.querySelector('.e-nat').value);
         const idRequired = !EXEMPT.has(nationality);
         return {
           booking_id: s.id, position: i + 1,
@@ -310,7 +317,7 @@
     document.getElementById('list').addEventListener('input', e => {
       if (!e.target.classList.contains('e-nat')) return;
       const row = e.target.closest('.edit-row');
-      const needs = e.target.value.trim() && !EXEMPT.has(e.target.value.trim());
+      const needs = e.target.value.trim() && !EXEMPT.has(canonicalNat(e.target.value));
       row.querySelectorAll('.idf').forEach(i => { i.disabled = !needs; });
     });
 

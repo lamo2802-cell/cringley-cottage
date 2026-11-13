@@ -183,7 +183,7 @@ function bookingRows(b: DigestBooking, todayUK: string): string {
     if (party) rows += infoRow("Party", party);
     if (b.guest_phone) rows += infoRow("Phone", escapeHtml(b.guest_phone));
     if (b.checkout > todayUK) rows += infoRow("Payment", outstanding > 0 ? `${money(outstanding)} still to pay` : "Paid in full");
-    if (b.checkout >= todayUK) rows += infoRow("Guest register", b.guest_register_saved_at ? "Filled in" : "Not filled in yet");
+    if (b.checkin >= todayUK) rows += infoRow("Guest register", b.guest_register_saved_at ? "Filled in" : "Not filled in yet");
     if (b.message) rows += infoRow("Their note", escapeHtml(b.message));
   } else {
     rows += infoRow("Guest", `See the ${SOURCE_LABELS[b.source] || b.source} app`);

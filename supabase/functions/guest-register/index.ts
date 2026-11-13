@@ -19,7 +19,8 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
 //   { action: "save", token, guests }   → replaces the register for the stay
 //
 // Saved ID numbers are never sent back in full: the page shows the last 4
-// characters, and leaving the box blank keeps the number already saved.
+// characters, and leaving the box blank keeps the number already saved for
+// a guest of the same name.
 // Guests can change their details until their checkout day. Rows are
 // deleted 12 months after checkout by a daily database job.
 
@@ -205,10 +206,11 @@ Deno.serve(async (req: Request) => {
         idNumber = String(g.id_document_number ?? "").replace(/\s+/g, "").toUpperCase();
         issuedAt = clean(g.id_document_issued_at, 60);
         nextDest = clean(g.next_destination, 200);
-        // Blank means "keep the number already saved" for the same person.
+        // Blank means "keep the number already saved" for the same person
+        // (matched by name, so removing or reordering guests doesn't lose it).
         if (!idNumber) {
-          const prev = saved[i];
-          if (prev && prev.id_document_number && prev.full_name === fullName) idNumber = prev.id_document_number;
+          const prev = saved.find(r => r.id_document_number && r.full_name.toLowerCase() === fullName.toLowerCase());
+          if (prev) idNumber = prev.id_document_number;
         }
         if (!/^[A-Z0-9-]{4,30}$/.test(idNumber)) return json({ ok: false, error: `${who}: please enter their passport or ID card number (letters and numbers only).` }, 400);
         if (issuedAt.length < 2 || issuedAt.length > 60) return json({ ok: false, error: `${who}: please say which country (or office) issued their passport or ID card.` }, 400);
