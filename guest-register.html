@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<meta name="referrer" content="no-referrer">
+<title>Guest registration — Cringley Cottage</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --ink: #232120; --cream: #f3ede3; --stone: #dfd8cb;
+    --sage: #5e7a52; --sage-light: #84a472; --muted: #7a6f60; --white: #fff;
+  }
+  body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(--ink); line-height: 1.7; }
+  nav { background: var(--ink); padding: 1.2rem 6%; display: flex; align-items: center; justify-content: space-between; }
+  .nav-logo {
+    font-family: 'Cormorant Garamond', serif; font-size: 1.3rem; font-weight: 600;
+    color: #fff; letter-spacing: 0.14em; text-transform: uppercase;
+    text-decoration: none; border: 1px solid rgba(255,255,255,0.25);
+    padding: 0.35rem 0.9rem; border-radius: 2px;
+  }
+  .wrap { max-width: 620px; margin: 0 auto; padding: 3rem 6% 5rem; }
+  .label { font-size: 0.72rem; letter-spacing: 0.22em; text-transform: uppercase; color: var(--sage); font-weight: 500; margin-bottom: 0.6rem; }
+  h1 { font-family: 'Cormorant Garamond', serif; font-size: clamp(2rem, 5vw, 2.8rem); font-weight: 600; line-height: 1.1; margin-bottom: 0.6rem; }
+  h2 { font-family: 'Cormorant Garamond', serif; font-size: 1.35rem; font-weight: 600; line-height: 1.2; }
+  .sub { color: var(--muted); font-weight: 300; margin-bottom: 1.4rem; }
+  .intro { font-size: 0.93rem; margin-bottom: 2rem; }
+  .intro p { margin-bottom: 0.7rem; }
+  .card { background: var(--white); border-radius: 4px; box-shadow: 0 1px 4px rgba(0,0,0,0.07); padding: 1.6rem; margin-bottom: 1.4rem; }
+  .card-head { display: flex; justify-content: space-between; align-items: baseline; gap: 1rem; margin-bottom: 1rem; }
+  .remove { background: none; border: none; color: var(--muted); font: inherit; font-size: 0.8rem; text-decoration: underline; cursor: pointer; }
+  .field { margin-bottom: 1.2rem; }
+  .field:last-child { margin-bottom: 0; }
+  .field > label { display: block; font-weight: 500; font-size: 0.92rem; margin-bottom: 0.25rem; }
+  .hint { font-size: 0.8rem; color: var(--muted); font-weight: 300; margin-bottom: 0.5rem; }
+  input[type=text], select {
+    width: 100%; font: inherit; font-size: 0.95rem; color: var(--ink);
+    border: 1px solid var(--stone); border-radius: 2px; padding: 0.7rem 0.8rem; background: #fdfbf7;
+  }
+  input:focus, select:focus { outline: 2px solid var(--sage-light); outline-offset: 0; border-color: var(--sage-light); }
+  .extra { border-left: 3px solid var(--sage-light); padding-left: 1rem; margin-top: 1.2rem; }
+  .extra-note { font-size: 0.85rem; background: rgba(94,122,82,0.08); border-radius: 2px; padding: 0.7rem 0.9rem; margin-bottom: 1.1rem; }
+  .btn {
+    display: inline-block; background: var(--sage); color: var(--cream); border: none;
+    padding: 0.85rem 1.6rem; font: inherit; font-size: 0.8rem; letter-spacing: 0.08em; text-transform: uppercase;
+    border-radius: 2px; cursor: pointer; text-decoration: none;
+  }
+  .btn:hover { background: var(--sage-light); }
+  .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .btn.secondary { background: none; color: var(--ink); border: 1px solid var(--stone); }
+  .btn.secondary:hover { background: var(--white); }
+  .actions { display: flex; gap: 0.8rem; flex-wrap: wrap; align-items: center; margin-bottom: 1.4rem; }
+  .msg { font-size: 0.9rem; padding: 0.9rem 1rem; border-radius: 2px; margin-bottom: 1.2rem; }
+  .msg.err { background: rgba(180,80,60,0.1); border: 1px solid rgba(180,80,60,0.3); color: #7d3424; }
+  .msg.ok { background: rgba(94,122,82,0.1); border: 1px solid rgba(94,122,82,0.3); }
+  .summary { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+  .summary td { padding: 0.35rem 0; border-top: 1px solid var(--stone); vertical-align: top; }
+  .summary td:first-child { color: var(--muted); width: 45%; padding-right: 1rem; }
+  .small { font-size: 0.8rem; color: var(--muted); }
+  .small a { color: var(--sage); }
+  [hidden] { display: none !important; }
+  footer { text-align: center; padding: 2rem 6%; font-size: 0.75rem; color: var(--muted); }
+  footer a { color: var(--sage); }
+</style>
+</head>
+<body>
+<nav><a class="nav-logo" href="index.html">Cringley Cottage</a></nav>
+
+<div class="wrap">
+  <p class="label">Before you arrive</p>
+
+  <section id="loading"><h1>Just a moment…</h1></section>
+  <section id="bad" hidden>
+    <h1>We can't open this page</h1>
+    <div class="msg err" id="badMsg" role="alert"></div>
+    <p class="small"><a href="index.html">Back to cringleycottage.com</a></p>
+  </section>
+
+  <!-- The form -->
+  <section id="formStep" hidden>
+    <h1>Guest registration</h1>
+    <p class="sub" id="stayLine"></p>
+    <div class="intro">
+      <p>UK law asks every place that offers paid accommodation to keep a short register of guests aged 16 or over. Please fill in a line for each of them. It takes a minute.</p>
+      <p>British, Irish and Commonwealth citizens only need to give their name and nationality. For anyone else, the law also asks for their passport or ID card number and where they're going after their stay. We never need a photo or copy of your passport.</p>
+    </div>
+    <div class="msg err" id="formErr" role="alert" hidden></div>
+    <div id="guestCards"></div>
+    <div class="actions">
+      <button class="btn secondary" id="addGuestBtn" type="button" hidden>Add a guest aged 16 or 17</button>
+    </div>
+    <div class="actions">
+      <button class="btn" id="saveBtn" type="button">Save guest details</button>
+    </div>
+    <p class="small">We keep these details for 12 months after your stay, as the law requires, and then delete them. Only Mark and Ruth can see them, and we'd only ever show them to the police if asked. More in our <a href="privacy.html" target="_blank" rel="noopener">privacy notice</a>.</p>
+  </section>
+
+  <!-- Saved / read-only -->
+  <section id="doneStep" hidden>
+    <h1 id="doneTitle">Thank you</h1>
+    <p class="sub" id="doneLine"></p>
+    <div id="doneCards"></div>
+    <div class="actions">
+      <button class="btn secondary" id="editBtn" type="button">Change these details</button>
+    </div>
+    <p class="small" id="doneSmall"></p>
+  </section>
+</div>
+
+<footer>&copy; Cringley Cottage &middot; Stars And Stiles Limited &middot; <a href="privacy.html">Privacy</a></footer>
+
+<script>
+  const SUPABASE_URL = 'https://yfeyswuxhgezkpcjhznp.supabase.co';
+  const token = new URLSearchParams(window.location.search).get('t') || '';
+  const $ = id => document.getElementById(id);
+  let stay = null, nationalities = [], exempt = new Set(), editable = true;
+  let guests = [];   // [{ full_name, nationality, id_document_number, id_document_issued_at, next_destination, id_number_ends }]
+
+  function show(id) {
+    ['loading', 'bad', 'formStep', 'doneStep'].forEach(s => { $(s).hidden = s !== id; });
+    window.scrollTo(0, 0);
+  }
+  function fail(msg) { $('badMsg').textContent = msg; show('bad'); }
+  function niceDate(d) {
+    return new Date(d + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+  }
+  function esc(s) {
+    return (s ?? '').toString().replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+  async function call(payload) {
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/guest-register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token, ...payload }),
+    });
+    return res.json();
+  }
+  function needsId(nat) { return !!nat && !exempt.has(nat); }
+
+  function nationalityOptions(selected) {
+    const top = nationalities.filter(n => n.name === 'British' || n.name === 'Irish');
+    const rest = nationalities.filter(n => n.name !== 'British' && n.name !== 'Irish');
+    const opt = n => `<option value="${esc(n.name)}"${n.name === selected ? ' selected' : ''}>${esc(n.name)}</option>`;
+    return `<option value="">Choose…</option>${top.map(opt).join('')}<option disabled>──────────</option>${rest.map(opt).join('')}`;
+  }
+
+  // Keeps what's been typed when cards are redrawn (adding/removing a guest).
+  function readCards() {
+    document.querySelectorAll('.guest-card').forEach((card, i) => {
+      const g = guests[i];
+      g.full_name = card.querySelector('.g-name').value;
+      g.nationality = card.querySelector('.g-nat').value;
+      g.id_document_number = card.querySelector('.g-idnum').value;
+      g.id_document_issued_at = card.querySelector('.g-issued').value;
+      g.next_destination = card.querySelector('.g-next').value;
+    });
+  }
+
+  function renderCards() {
+    $('guestCards').innerHTML = guests.map((g, i) => {
+      const keepHint = g.id_number_ends ? `We already have a number ending ${esc(g.id_number_ends)}. Leave this blank to keep it.` : 'As printed on the passport or ID card.';
+      return `
+      <div class="card guest-card">
+        <div class="card-head">
+          <h2>Guest ${i + 1}${i === 0 ? ' <span class="small">(lead guest)</span>' : ''}</h2>
+          ${i >= stay.adults ? `<button type="button" class="remove" data-i="${i}">Remove</button>` : ''}
+        </div>
+        <div class="field">
+          <label for="name${i}">Full name</label>
+          <input type="text" id="name${i}" class="g-name" maxlength="100" autocomplete="${i === 0 ? 'name' : 'off'}" value="${esc(g.full_name)}">
+        </div>
+        <div class="field">
+          <label for="nat${i}">Nationality</label>
+          <p class="hint">As shown on the passport they're travelling with.</p>
+          <select id="nat${i}" class="g-nat">${nationalityOptions(g.nationality)}</select>
+        </div>
+        <div class="extra" ${needsId(g.nationality) ? '' : 'hidden'}>
+          <p class="extra-note">UK law asks guests who aren't British, Irish or Commonwealth citizens for these too.</p>
+          <div class="field">
+            <label for="idnum${i}">Passport or ID card number</label>
+            <p class="hint">${keepHint}</p>
+            <input type="text" id="idnum${i}" class="g-idnum" maxlength="30" autocomplete="off" spellcheck="false" value="${esc(g.id_document_number)}">
+          </div>
+          <div class="field">
+            <label for="issued${i}">Where it was issued</label>
+            <p class="hint">The country (or office) that issued it, e.g. "France".</p>
+            <input type="text" id="issued${i}" class="g-issued" maxlength="60" value="${esc(g.id_document_issued_at)}">
+          </div>
+          <div class="field">
+            <label for="next${i}">Where you're going after Cringley Cottage</label>
+            <p class="hint">A town or the address if you know it, e.g. "Home to Lyon" or "Hotel in Edinburgh". You can change this before you leave.</p>
+            <input type="text" id="next${i}" class="g-next" maxlength="200" value="${esc(g.next_destination)}">
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+    $('addGuestBtn').hidden = guests.length >= stay.total_guests;
+  }
+
+  $('guestCards').addEventListener('change', e => {
+    if (!e.target.classList.contains('g-nat')) return;
+    const card = e.target.closest('.guest-card');
+    card.querySelector('.extra').hidden = !needsId(e.target.value);
+  });
+  $('guestCards').addEventListener('click', e => {
+    const b = e.target.closest('.remove'); if (!b) return;
+    readCards();
+    guests.splice(Number(b.dataset.i), 1);
+    renderCards();
+  });
+  $('addGuestBtn').addEventListener('click', () => {
+    readCards();
+    guests.push(blankGuest());
+    renderCards();
+  });
+
+  function blankGuest(name = '') {
+    return { full_name: name, nationality: '', id_document_number: '', id_document_issued_at: '', next_destination: '', id_number_ends: '' };
+  }
+
+  function problem() {
+    for (let i = 0; i < guests.length; i++) {
+      const g = guests[i], who = `Guest ${i + 1}`;
+      if (g.full_name.trim().length < 2) return `${who}: please enter their full name.`;
+      if (!g.nationality) return `${who}: please choose their nationality.`;
+      if (needsId(g.nationality)) {
+        if (!g.id_document_number.trim() && !g.id_number_ends) return `${who}: please enter their passport or ID card number.`;
+        if (g.id_document_issued_at.trim().length < 2) return `${who}: please say where their passport or ID card was issued.`;
+        if (g.next_destination.trim().length < 2) return `${who}: please say where they're going after Cringley Cottage.`;
+      }
+    }
+    return '';
+  }
+
+  $('saveBtn').addEventListener('click', async () => {
+    readCards();
+    const p = problem();
+    if (p) { $('formErr').textContent = p; $('formErr').hidden = false; $('formErr').scrollIntoView({ block: 'center' }); return; }
+    $('formErr').hidden = true;
+    const btn = $('saveBtn');
+    btn.disabled = true; btn.textContent = 'Saving…';
+    try {
+      const data = await call({
+        action: 'save',
+        guests: guests.map(g => ({
+          full_name: g.full_name, nationality: g.nationality,
+          id_document_number: needsId(g.nationality) ? g.id_document_number : '',
+          id_document_issued_at: needsId(g.nationality) ? g.id_document_issued_at : '',
+          next_destination: needsId(g.nationality) ? g.next_destination : '',
+        })),
+      });
+      if (data.ok) { await load(true); return; }
+      $('formErr').textContent = data.error || 'Something went wrong. Please try again.';
+      $('formErr').hidden = false;
+    } catch (e) {
+      $('formErr').textContent = 'Something went wrong. Please check your connection and try again.';
+      $('formErr').hidden = false;
+    }
+    btn.disabled = false; btn.textContent = 'Save guest details';
+  });
+
+  function showDone(justSaved) {
+    $('doneTitle').textContent = justSaved ? 'Thank you, that\'s all done' : (editable ? 'You\'re registered' : 'Guest registration');
+    $('doneLine').textContent = `Cringley Cottage, ${niceDate(stay.checkin)} to ${niceDate(stay.checkout)}`;
+    $('doneCards').innerHTML = guests.map((g, i) => `
+      <div class="card">
+        <h2 style="margin-bottom:0.6rem;">Guest ${i + 1}</h2>
+        <table class="summary">
+          <tr><td>Full name</td><td>${esc(g.full_name)}</td></tr>
+          <tr><td>Nationality</td><td>${esc(g.nationality)}</td></tr>
+          ${needsId(g.nationality) ? `
+          <tr><td>Passport or ID number</td><td>${g.id_number_ends ? 'ending ' + esc(g.id_number_ends) : 'saved'}</td></tr>
+          <tr><td>Issued in</td><td>${esc(g.id_document_issued_at)}</td></tr>
+          <tr><td>Going on to</td><td>${esc(g.next_destination)}</td></tr>` : ''}
+        </table>
+      </div>`).join('');
+    $('editBtn').hidden = !editable;
+    $('doneSmall').innerHTML = editable
+      ? `You can change these details until you check out on ${esc(niceDate(stay.checkout))}. We keep them for 12 months after your stay and then delete them. <a href="privacy.html" target="_blank" rel="noopener">Privacy notice</a>`
+      : 'Your stay has ended, so these details can\'t be changed here. If something\'s wrong, just reply to any of our emails.';
+    show('doneStep');
+  }
+  $('editBtn').addEventListener('click', () => { renderCards(); show('formStep'); });
+
+  async function load(justSaved = false) {
+    const data = await call({ action: 'get' });
+    if (!data.ok) return fail(data.error || "This link isn't valid.");
+    stay = data.stay;
+    editable = data.editable;
+    nationalities = data.nationalities || [];
+    exempt = new Set(nationalities.filter(n => n.exempt).map(n => n.name));
+    $('stayLine').textContent = `${stay.booking_ref ? stay.booking_ref + ' · ' : ''}${niceDate(stay.checkin)} to ${niceDate(stay.checkout)}`;
+    if (data.guests && data.guests.length) {
+      guests = data.guests.map(g => ({ ...g, id_document_number: '' }));
+      return showDone(justSaved);
+    }
+    if (!editable) return fail("Your stay has ended, so this form is closed. If you have a question, just reply to any of our emails.");
+    const lead = [stay.first_name, stay.last_name].filter(Boolean).join(' ');
+    guests = [blankGuest(lead)];
+    while (guests.length < stay.adults) guests.push(blankGuest());
+    renderCards();
+    show('formStep');
+  }
+
+  (async () => {
+    if (!token) return fail('This link is missing its code. Please use the link in the email we sent you.');
+    try { await load(); }
+    catch (e) { fail('Something went wrong loading this page. Please try again in a minute.'); }
+  })();
+</script>
+</body>
+</html>
