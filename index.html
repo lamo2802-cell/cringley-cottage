@@ -1213,7 +1213,9 @@
     </div>
 
     <div class="walk-card">
-      <img class="walk-clip" src="mill-gill-force-square.jpg" loading="lazy" width="640" height="640" alt="Mill Gill Force in autumn, a short walk from the cottage">
+      <video class="walk-clip" muted loop playsinline preload="none" poster="mill-gill-force-poster.jpg" width="640" height="640" aria-label="Mill Gill Force in autumn, a short walk from the cottage">
+        <source data-src="mill-gill-force.mp4" type="video/mp4">
+      </video>
       <div class="walk-distance">0.5 mi</div>
       <h3 class="walk-name">Mill Gill Force</h3>
       <p class="walk-desc">A short stroll from the village to a beautiful hidden waterfall through ancient woodland. Perfect for all abilities.</p>
@@ -1235,7 +1237,7 @@
     </div>
 
     <div class="walk-card">
-      <video class="walk-clip" id="fallsClip" muted loop playsinline preload="none" poster="aysgarth-falls-poster.jpg" width="640" height="640" aria-label="Aysgarth Falls, filmed from above">
+      <video class="walk-clip" muted loop playsinline preload="none" poster="aysgarth-falls-poster.jpg" width="640" height="640" aria-label="Aysgarth Falls, filmed from above">
         <source data-src="aysgarth-falls.mp4" type="video/mp4">
       </video>
       <div class="walk-distance">6 mi</div>
@@ -2796,10 +2798,8 @@
     });
   })();
 
-  // ─── AYSGARTH FALLS CLIP: load and play only while on screen ─────
-  (function() {
-    const clip = document.getElementById('fallsClip');
-    if (!clip) return;
+  // ─── WALK CLIPS (Aysgarth, Mill Gill): load and play only while on screen ─────
+  document.querySelectorAll('video.walk-clip').forEach(function(clip) {
     const conn = navigator.connection || {};
     const slow = conn.saveData || /(^|-)(2g|3g)$/.test(conn.effectiveType || '');
     const lessMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -2820,7 +2820,7 @@
         }
       });
     }, { rootMargin: '200px 0px' }).observe(clip);
-  })();
+  });
 
   // ─── FLOATING BOOK NOW BUTTON ───────────────────────────────────
   (() => {
